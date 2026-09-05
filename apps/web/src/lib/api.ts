@@ -2,6 +2,17 @@ import { z } from "zod";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("The SmartLearn API is not reachable from this deployment yet.");
+    }
+    throw error;
+  }
+}
+
 export const documentStatusSchema = z.object({
   document_id: z.string(),
   stage: z.string(),
@@ -103,7 +114,7 @@ export type LearningPackageResponse = {
 };
 
 export async function createGuestSession() {
-  const response = await fetch(`${API_BASE_URL}/guest/session`, { method: "POST" });
+  const response = await apiFetch(`${API_BASE_URL}/guest/session`, { method: "POST" });
   if (!response.ok) throw new Error("Unable to start guest session");
   return response.json();
 }
@@ -116,7 +127,7 @@ function authHeaders(accessToken?: string | null, guestSession?: string | null) 
 }
 
 export async function getUsage(accessToken?: string | null, guestSession?: string | null) {
-  const response = await fetch(`${API_BASE_URL}/me/usage`, {
+  const response = await apiFetch(`${API_BASE_URL}/me/usage`, {
     headers: authHeaders(accessToken, guestSession),
   });
   if (!response.ok) throw new Error("Unable to load usage");
@@ -124,7 +135,7 @@ export async function getUsage(accessToken?: string | null, guestSession?: strin
 }
 
 export async function listDocuments(accessToken?: string | null, guestSession?: string | null): Promise<DocumentListItem[]> {
-  const response = await fetch(`${API_BASE_URL}/documents`, {
+  const response = await apiFetch(`${API_BASE_URL}/documents`, {
     headers: authHeaders(accessToken, guestSession),
   });
   if (!response.ok) {
@@ -137,7 +148,7 @@ export async function listDocuments(accessToken?: string | null, guestSession?: 
 export async function uploadDocument(file: File, accessToken?: string | null, guestSession?: string | null): Promise<DocumentStatus> {
   const form = new FormData();
   form.append("file", file);
-  const response = await fetch(`${API_BASE_URL}/documents`, {
+  const response = await apiFetch(`${API_BASE_URL}/documents`, {
     method: "POST",
     headers: { "Idempotency-Key": crypto.randomUUID(), ...authHeaders(accessToken, guestSession) },
     body: form,
@@ -150,7 +161,7 @@ export async function uploadDocument(file: File, accessToken?: string | null, gu
 }
 
 export async function deleteDocument(documentId: string, accessToken?: string | null, guestSession?: string | null) {
-  const response = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/documents/${documentId}`, {
     method: "DELETE",
     headers: authHeaders(accessToken, guestSession),
   });
@@ -162,7 +173,7 @@ export async function retryDocument(
   accessToken?: string | null,
   guestSession?: string | null,
 ): Promise<DocumentStatus> {
-  const response = await fetch(`${API_BASE_URL}/documents/${documentId}/retry`, {
+  const response = await apiFetch(`${API_BASE_URL}/documents/${documentId}/retry`, {
     method: "POST",
     headers: authHeaders(accessToken, guestSession),
   });
@@ -178,7 +189,7 @@ export async function getPackage(
   accessToken?: string | null,
   guestSession?: string | null,
 ): Promise<LearningPackageResponse> {
-  const response = await fetch(`${API_BASE_URL}/learning-packages/${packageId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/learning-packages/${packageId}`, {
     headers: authHeaders(accessToken, guestSession),
   });
   if (!response.ok) throw new Error("Unable to load package");
@@ -190,7 +201,7 @@ export async function createQuizAttempt(
   accessToken?: string | null,
   guestSession?: string | null,
 ): Promise<QuizAttempt> {
-  const response = await fetch(`${API_BASE_URL}/learning-packages/${packageId}/quiz-attempts`, {
+  const response = await apiFetch(`${API_BASE_URL}/learning-packages/${packageId}/quiz-attempts`, {
     method: "POST",
     headers: authHeaders(accessToken, guestSession),
   });
@@ -205,7 +216,7 @@ export async function answerQuizQuestion(
   accessToken?: string | null,
   guestSession?: string | null,
 ): Promise<QuizAnswerResult> {
-  const response = await fetch(`${API_BASE_URL}/quiz-attempts/${attemptId}/answers`, {
+  const response = await apiFetch(`${API_BASE_URL}/quiz-attempts/${attemptId}/answers`, {
     method: "PATCH",
     headers: { "content-type": "application/json", ...authHeaders(accessToken, guestSession) },
     body: JSON.stringify({ question_id: questionId, selected_index: selectedIndex }),
@@ -219,7 +230,7 @@ export async function completeQuizAttempt(
   accessToken?: string | null,
   guestSession?: string | null,
 ): Promise<QuizAttempt> {
-  const response = await fetch(`${API_BASE_URL}/quiz-attempts/${attemptId}/complete`, {
+  const response = await apiFetch(`${API_BASE_URL}/quiz-attempts/${attemptId}/complete`, {
     method: "POST",
     headers: authHeaders(accessToken, guestSession),
   });
@@ -233,7 +244,7 @@ export async function getVideoUrl(
   accessToken?: string | null,
   guestSession?: string | null,
 ): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/video-assets/${videoAssetId}/${mode}-url`, {
+  const response = await apiFetch(`${API_BASE_URL}/video-assets/${videoAssetId}/${mode}-url`, {
     headers: authHeaders(accessToken, guestSession),
   });
   if (!response.ok) {
