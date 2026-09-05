@@ -17,6 +17,7 @@ test-results/
 supabase/.temp/
 .DS_Store
 *.log
+*.tgz
 *.mp4
 *.pdf
 !apps/api/tests/fixtures/*.pdf
