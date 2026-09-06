@@ -12,6 +12,12 @@ export function Dashboard() {
   const documents = useQuery({
     queryKey: ["documents", session?.access_token, guestSession],
     queryFn: () => listDocuments(session?.access_token, guestSession),
+    refetchInterval: (query) => {
+      const hasProcessingDocument = query.state.data?.some(
+        (document) => !document.package_id && document.stage !== "failed",
+      );
+      return hasProcessingDocument ? 3000 : false;
+    },
   });
   const removeDocument = useMutation({
     mutationFn: (documentId: string) => deleteDocument(documentId, session?.access_token, guestSession),

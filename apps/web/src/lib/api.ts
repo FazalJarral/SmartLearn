@@ -166,6 +166,21 @@ export async function uploadDocument(file: File, accessToken?: string | null, gu
   return documentStatusSchema.parse(await response.json());
 }
 
+export async function getDocumentStatus(
+  documentId: string,
+  accessToken?: string | null,
+  guestSession?: string | null,
+): Promise<DocumentStatus> {
+  const response = await apiFetch(`${API_BASE_URL}/documents/${documentId}/status`, {
+    headers: authHeaders(accessToken, guestSession),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? "Unable to load document status");
+  }
+  return documentStatusSchema.parse(await response.json());
+}
+
 export async function deleteDocument(documentId: string, accessToken?: string | null, guestSession?: string | null) {
   const response = await apiFetch(`${API_BASE_URL}/documents/${documentId}`, {
     method: "DELETE",

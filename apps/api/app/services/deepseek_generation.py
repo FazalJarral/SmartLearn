@@ -88,11 +88,13 @@ def build_user_prompt(input_data: GenerationInput) -> str:
 {json.dumps(SCHEMA_EXAMPLE, ensure_ascii=True)}
 
 Bounds:
-- 5 to 15 key_points
-- 8 to 20 flashcards
-- 5 to 10 quiz questions
+- keep all text concise
+- 5 to 8 key_points
+- 8 to 12 flashcards
+- 5 to 7 quiz questions
 - exactly 4 quiz options and one correct_option_index from 0 to 3
-- video narration should be suitable for 30 to 60 seconds
+- video narration should be suitable for 30 to 45 seconds
+- create 3 to 5 video scenes
 - each video scene duration_seconds must be an integer from 3 to 12
 - video scene template must be one of title, bullet_list, comparison, process, definition
 

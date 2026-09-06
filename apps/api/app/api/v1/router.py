@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, Header, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Header, Response, UploadFile
 
 from app.core.config import get_settings
 from app.core.errors import ApiError
@@ -186,6 +186,88 @@ def _source_storage_path(actor: Actor, document_id: UUID, filename: str) -> str:
     return f"{actor_kind}/{actor_id}/documents/{document_id}/source.{safe_suffix}"
 
 
+async def _generate_and_persist_document(
+    document_id: str,
+    filename: str,
+    processed_page_count: int,
+    page_aware_text: str,
+    generation_job_id: str,
+) -> None:
+    settings = get_settings()
+    service = SupabaseService(settings)
+    generator = get_generator(settings)
+    try:
+        await service.update(
+            "processing_jobs",
+            generation_job_id,
+            {
+                "stage": ProcessingStage.GENERATING_CONTENT.value,
+                "progress": 55,
+                "user_message": "Generating study material from the PDF.",
+            },
+        )
+        study_package = await generator.generate(
+            GenerationInput(
+                filename=filename,
+                page_count=processed_page_count,
+                page_aware_text=page_aware_text,
+            )
+        )
+        await service.update(
+            "processing_jobs",
+            generation_job_id,
+            {
+                "stage": ProcessingStage.GENERATING_CONTENT.value,
+                "progress": 65,
+                "user_message": "Saving generated study material.",
+            },
+        )
+        await _persist_study_package(
+            service,
+            document_id,
+            study_package.model_dump(exclude_none=True),
+            settings.generation_provider,
+        )
+        await service.update("documents", document_id, {"status": ProcessingStage.CONTENT_READY.value})
+        await service.update(
+            "processing_jobs",
+            generation_job_id,
+            {
+                "stage": ProcessingStage.CONTENT_READY.value,
+                "progress": 80,
+                "error_code": None,
+                "user_message": "Study material is ready. Video rendering is queued.",
+                "diagnostic_detail": None,
+            },
+        )
+    except ApiError as exc:
+        await service.update("documents", document_id, {"status": ProcessingStage.FAILED.value})
+        await service.update(
+            "processing_jobs",
+            generation_job_id,
+            {
+                "stage": ProcessingStage.FAILED.value,
+                "progress": 100,
+                "error_code": exc.code,
+                "user_message": exc.message,
+                "diagnostic_detail": "content generation failed after upload acceptance",
+            },
+        )
+    except Exception:
+        await service.update("documents", document_id, {"status": ProcessingStage.FAILED.value})
+        await service.update(
+            "processing_jobs",
+            generation_job_id,
+            {
+                "stage": ProcessingStage.FAILED.value,
+                "progress": 100,
+                "error_code": "generation_failed",
+                "user_message": "Study-material generation failed. Try again.",
+                "diagnostic_detail": "unexpected content generation failure after upload acceptance",
+            },
+        )
+
+
 @router.post("/guest/session", response_model=GuestSessionResponse, tags=["guest"])
 async def create_guest_session() -> GuestSessionResponse:
     settings = get_settings()
@@ -277,6 +359,7 @@ async def list_documents(
 
 @router.post("/documents", response_model=DocumentStatusResponse, tags=["documents"])
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File()],
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
@@ -340,47 +423,21 @@ async def upload_document(
         )
     )[0]
 
-    generator = get_generator(settings)
-    try:
-        study_package = await generator.generate(
-            GenerationInput(
-                filename=validation.filename,
-                page_count=extracted.processed_page_count,
-                page_aware_text=extracted.combined_text,
-            )
-        )
-    except ApiError as exc:
-        await service.update(
-            "documents",
-            document["id"],
-            {"status": ProcessingStage.FAILED.value},
-        )
-        await service.update(
-            "processing_jobs",
-            generation_job["id"],
-            {
-                "stage": ProcessingStage.FAILED.value,
-                "progress": 40,
-                "error_code": exc.code,
-                "user_message": exc.message,
-                "diagnostic_detail": "content generation failed after validation and quota acceptance",
-            },
-        )
-        raise
-    content = study_package.model_dump(exclude_none=True)
-    package = await _persist_study_package(service, document["id"], content, settings.generation_provider)
-    await service.update(
-        "documents",
+    background_tasks.add_task(
+        _generate_and_persist_document,
         document["id"],
-        {"status": ProcessingStage.CONTENT_READY.value},
+        validation.filename,
+        extracted.processed_page_count,
+        extracted.combined_text,
+        generation_job["id"],
     )
     return DocumentStatusResponse(
         document_id=document["id"],
-        stage=ProcessingStage.CONTENT_READY,
-        progress=70,
-        message="Document accepted and study material persisted. Video rendering is queued.",
+        stage=ProcessingStage.GENERATING_CONTENT,
+        progress=45,
+        message="Document accepted. SmartLearn is generating your study material.",
         warnings=[extracted.truncation_message] if extracted.truncation_message else [],
-        package_id=package["id"],
+        package_id=None,
     )
 
 
@@ -452,6 +509,7 @@ async def delete_document(
 @router.post("/documents/{document_id}/retry", response_model=DocumentStatusResponse, tags=["documents"])
 async def retry_document(
     document_id: UUID,
+    background_tasks: BackgroundTasks,
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     x_guest_session: Annotated[str | None, Header(alias="X-Guest-Session")] = None,
 ) -> DocumentStatusResponse:
@@ -495,43 +553,20 @@ async def retry_document(
         )
     )[0]
 
-    generator = get_generator(settings)
-    try:
-        study_package = await generator.generate(
-            GenerationInput(
-                filename=document["original_filename"],
-                page_count=extracted.processed_page_count,
-                page_aware_text=extracted.combined_text,
-            )
-        )
-    except ApiError as exc:
-        await service.update("documents", str(document_id), {"status": ProcessingStage.FAILED.value})
-        await service.update(
-            "processing_jobs",
-            generation_job["id"],
-            {
-                "stage": ProcessingStage.FAILED.value,
-                "progress": 45,
-                "error_code": exc.code,
-                "user_message": exc.message,
-                "diagnostic_detail": "content generation retry failed",
-            },
-        )
-        raise
-
-    package = await _persist_study_package(
-        service,
+    background_tasks.add_task(
+        _generate_and_persist_document,
         str(document_id),
-        study_package.model_dump(exclude_none=True),
-        settings.generation_provider,
+        document["original_filename"],
+        extracted.processed_page_count,
+        extracted.combined_text,
+        generation_job["id"],
     )
-    await service.update("documents", str(document_id), {"status": ProcessingStage.CONTENT_READY.value})
     return DocumentStatusResponse(
         document_id=document_id,
-        stage=ProcessingStage.CONTENT_READY,
-        progress=_progress_for_status(ProcessingStage.CONTENT_READY.value),
-        message="Retry succeeded and study material was regenerated.",
-        package_id=package["id"],
+        stage=ProcessingStage.GENERATING_CONTENT,
+        progress=_progress_for_status(ProcessingStage.GENERATING_CONTENT.value),
+        message="Retry started. SmartLearn is regenerating your study material.",
+        package_id=None,
     )
 
 
@@ -549,11 +584,22 @@ async def document_status(
         "learning_packages",
         {"select": "id", "document_id": f"eq.{document_id}", "limit": "1"},
     )
+    job_rows = await service.select(
+        "processing_jobs",
+        {
+            "select": "progress,user_message,error_code",
+            "document_id": f"eq.{document_id}",
+            "order": "updated_at.desc",
+            "limit": "1",
+        },
+    )
+    job = job_rows[0] if job_rows else {}
     return DocumentStatusResponse(
         document_id=document_id,
         stage=ProcessingStage(document["status"]),
-        progress=_progress_for_status(document["status"]),
-        message="Status loaded from Supabase.",
+        progress=job.get("progress") or _progress_for_status(document["status"]),
+        message=job.get("user_message") or "Status loaded from Supabase.",
+        error_code=job.get("error_code"),
         package_id=package_rows[0]["id"] if package_rows else None,
     )
 

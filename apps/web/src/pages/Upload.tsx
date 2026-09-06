@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { UploadCloud } from "lucide-react";
 
-import { createGuestSession, getUsage, uploadDocument } from "../lib/api";
+import { createGuestSession, getDocumentStatus, getUsage, uploadDocument } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 const MAX_CLIENT_BYTES = 15 * 1024 * 1024;
@@ -28,6 +28,18 @@ export function Upload() {
       return uploadDocument(selectedFile, session?.access_token, activeGuestSession);
     },
   });
+  const uploadStatus = useQuery({
+    queryKey: ["document-status", upload.data?.document_id, session?.access_token, guestSession],
+    queryFn: () => getDocumentStatus(upload.data!.document_id, session?.access_token, guestSession),
+    enabled: Boolean(upload.data?.document_id && !upload.data?.package_id),
+    refetchInterval: (query) => {
+      const status = query.state.data;
+      return status && (status.package_id || status.stage === "failed") ? false : 2500;
+    },
+  });
+  const currentStatus = uploadStatus.data ?? upload.data;
+  const currentWarnings = upload.data?.warnings ?? currentStatus?.warnings ?? [];
+  const isProcessing = currentStatus && !currentStatus.package_id && currentStatus.stage !== "failed";
 
   const clientError =
     file && file.size > MAX_CLIENT_BYTES
@@ -64,16 +76,29 @@ export function Upload() {
         {upload.isPending ? "Submitting..." : "Submit document"}
       </button>
       {upload.error ? <p className="mt-4 text-sm font-medium text-red-700">{upload.error.message}</p> : null}
-      {upload.data?.package_id ? (
+      {currentStatus ? (
         <div className="mt-4 space-y-2 text-sm">
-          {upload.data.warnings.map((warning) => (
+          {currentWarnings.map((warning) => (
             <p key={warning} className="font-medium text-amber-700">
               {warning}
             </p>
           ))}
-          <p>
-            {upload.data.message} <Link className="font-semibold text-sage underline" to={`/packages/${upload.data.package_id}`}>Open package</Link>
-          </p>
+          <div className="rounded-md border border-mist bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-medium">{currentStatus.message}</p>
+              <p className="text-slate-600">{currentStatus.progress}%</p>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-mist">
+              <div className="h-full rounded-full bg-sage transition-all" style={{ width: `${currentStatus.progress}%` }} />
+            </div>
+          </div>
+          {currentStatus.package_id ? (
+            <Link className="inline-block font-semibold text-sage underline" to={`/packages/${currentStatus.package_id}`}>
+              Open package
+            </Link>
+          ) : null}
+          {currentStatus.stage === "failed" ? <p className="font-medium text-red-700">{currentStatus.error_code ?? "Generation failed"}</p> : null}
+          {isProcessing ? <p className="text-slate-600">You can leave this page and check the dashboard while it finishes.</p> : null}
         </div>
       ) : null}
     </section>
