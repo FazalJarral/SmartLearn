@@ -50,13 +50,14 @@ class QuizQuestion(SourcePagesMixin):
 class VideoScene(BaseModel):
     template: Literal["title", "bullet_list", "comparison", "process", "definition"]
     text: list[str] = Field(min_length=1, max_length=6)
+    narration: str = Field(default="", max_length=500)
     duration_seconds: int = Field(ge=3, le=12)
 
 
 class VideoPlan(BaseModel):
     title: str = Field(min_length=1, max_length=120)
-    narration: str = Field(min_length=1, max_length=1200)
-    scenes: list[VideoScene] = Field(min_length=3, max_length=10)
+    narration: str = Field(min_length=1, max_length=1000)
+    scenes: list[VideoScene] = Field(min_length=3, max_length=4)
 
 
 class StudyPackage(BaseModel):

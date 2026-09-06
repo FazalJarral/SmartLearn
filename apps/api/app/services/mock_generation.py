@@ -32,8 +32,18 @@ def mock_study_package(title: str = "Uploaded Document") -> StudyPackage:
                 "narration": "This is placeholder narration for a short instructional video.",
                 "scenes": [
                     {"template": "title", "text": ["Mock Video"], "duration_seconds": 5},
-                    {"template": "definition", "text": ["A key idea", "A short explanation"], "duration_seconds": 6},
-                    {"template": "bullet_list", "text": ["Review", "Recall", "Apply"], "duration_seconds": 6},
+                    {
+                        "template": "definition",
+                        "text": ["A key idea", "A short explanation"],
+                        "narration": "This first concept is the anchor idea. Learn it first, then connect details back to it.",
+                        "duration_seconds": 10,
+                    },
+                    {
+                        "template": "bullet_list",
+                        "text": ["Review", "Recall", "Apply"],
+                        "narration": "Use review, recall, and application to check whether the concept is actually understood.",
+                        "duration_seconds": 10,
+                    },
                 ],
             },
         }

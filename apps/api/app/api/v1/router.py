@@ -303,7 +303,7 @@ async def _render_package_video(service: SupabaseService, document_id: str) -> N
         transcript_storage_path = transcript_path(asset)
         await service.storage_upload(transcript_storage_path, build_transcript(asset), "text/plain")
         with tempfile.TemporaryDirectory() as directory:
-            rendered = render_video(asset, Path(directory))
+            rendered = render_video(asset, Path(directory), get_settings())
             video_storage_path = video_path(asset)
             await service.storage_upload(video_storage_path, rendered.path.read_bytes(), "video/mp4")
         await service.update(
@@ -314,7 +314,7 @@ async def _render_package_video(service: SupabaseService, document_id: str) -> N
                 "video_storage_path": video_storage_path,
                 "transcript_storage_path": transcript_storage_path,
                 "duration_seconds": rendered.duration_seconds,
-                "narration_available": False,
+                "narration_available": rendered.narration_available,
                 "error_code": None,
                 "user_message": "Video is ready.",
                 "diagnostic_detail": "Rendered silent scene-based MP4 from the generated video plan.",

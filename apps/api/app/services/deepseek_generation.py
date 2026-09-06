@@ -41,8 +41,15 @@ SCHEMA_EXAMPLE = {
     ],
     "video": {
         "title": "Short title",
-        "narration": "Approximately 30-60 seconds",
-        "scenes": [{"template": "definition", "text": ["Term", "Explanation"], "duration_seconds": 6}],
+        "narration": "Complete voiceover script under 105 words",
+        "scenes": [
+            {
+                "template": "definition",
+                "text": ["Concept name", "One visual explanation"],
+                "narration": "One or two spoken sentences explaining the concept.",
+                "duration_seconds": 10,
+            }
+        ],
     },
 }
 
@@ -50,6 +57,7 @@ SCHEMA_EXAMPLE = {
 def normalize_study_package_payload(payload: dict) -> dict:
     scenes = payload.get("video", {}).get("scenes", [])
     if isinstance(scenes, list):
+        del scenes[4:]
         for scene in scenes:
             if not isinstance(scene, dict) or "duration_seconds" not in scene:
                 continue
@@ -58,6 +66,8 @@ def normalize_study_package_payload(payload: dict) -> dict:
             except (TypeError, ValueError):
                 continue
             scene["duration_seconds"] = min(max(duration, 3), 12)
+            if not scene.get("narration"):
+                scene["narration"] = " ".join(str(item) for item in scene.get("text", [])[:3])
     return payload
 
 
@@ -93,8 +103,10 @@ Bounds:
 - 8 to 12 flashcards
 - 5 to 7 quiz questions
 - exactly 4 quiz options and one correct_option_index from 0 to 3
-- video narration should be suitable for 30 to 45 seconds
-- create 3 to 5 video scenes
+- video must explain only the 3 to 4 most important concepts from the document
+- video narration must be under 105 words total and suitable for less than 60 seconds
+- create 3 or 4 video scenes, one concept per scene
+- each scene must include a narration field with 1-2 short spoken teaching sentences
 - each video scene duration_seconds must be an integer from 3 to 12
 - video scene template must be one of title, bullet_list, comparison, process, definition
 

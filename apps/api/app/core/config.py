@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     deepseek_timeout_seconds: int = Field(60, alias="DEEPSEEK_TIMEOUT_SECONDS")
     deepseek_max_tokens: int = Field(10000, alias="DEEPSEEK_MAX_TOKENS")
     max_extracted_chars: int = Field(60000, alias="MAX_EXTRACTED_CHARS")
+    openai_api_key: str = Field("", alias="OPENAI_API_KEY")
+    tts_provider: str = Field("openai", alias="TTS_PROVIDER")
+    tts_model: str = Field("gpt-4o-mini-tts", alias="TTS_MODEL")
+    tts_voice: str = Field("alloy", alias="TTS_VOICE")
 
     @property
     def cors_origins(self) -> list[str]:

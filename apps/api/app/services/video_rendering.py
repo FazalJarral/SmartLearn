@@ -7,10 +7,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import httpx
 from PIL import Image, ImageDraw, ImageFont
+
+from app.core.config import Settings
 
 WIDTH = 1280
 HEIGHT = 720
+MAX_VIDEO_SECONDS = 60
+MAX_NARRATION_WORDS = 105
 BACKGROUND = "#f6f7f2"
 INK = "#17201c"
 SAGE = "#5d7f69"
@@ -22,6 +27,7 @@ VALID_TEMPLATES = {"title", "bullet_list", "comparison", "process", "definition"
 class RenderedVideo:
     path: Path
     duration_seconds: int
+    narration_available: bool
 
 
 def transcript_path(asset: dict[str, Any]) -> str:
@@ -44,15 +50,25 @@ def sanitize_scene(scene: dict[str, Any]) -> dict[str, Any]:
     return {
         "template": template,
         "text": text,
+        "narration": str(scene.get("narration", "")).strip()[:500],
         "duration_seconds": min(max(duration, 3), 12),
     }
 
 
+def scene_narration(asset: dict[str, Any]) -> str:
+    scenes = [sanitize_scene(scene) for scene in asset.get("scenes", [])[:4]]
+    narration_parts = [scene["narration"] for scene in scenes if scene.get("narration")]
+    if not narration_parts:
+        narration_parts = [str(asset.get("narration", ""))]
+    words = " ".join(narration_parts).split()
+    return " ".join(words[:MAX_NARRATION_WORDS])
+
+
 def build_transcript(asset: dict[str, Any]) -> bytes:
     scenes = [sanitize_scene(scene) for scene in asset.get("scenes", [])]
-    lines = [asset.get("plan_title") or "SmartLearn Video Plan", "", asset.get("narration") or ""]
+    lines = [asset.get("plan_title") or "SmartLearn Video Plan", "", scene_narration(asset)]
     for index, scene in enumerate(scenes, start=1):
-        lines.extend(["", f"Scene {index}: {scene['template']}", *scene["text"]])
+        lines.extend(["", f"Scene {index}: {scene['template']}", scene["narration"], *scene["text"]])
     return "\n".join(lines).strip().encode("utf-8")
 
 
@@ -109,13 +125,39 @@ def draw_scene(scene: dict[str, Any], index: int, total: int, output_path: Path)
     image.save(output_path)
 
 
-def render_video(asset: dict[str, Any], output_dir: Path) -> RenderedVideo:
-    scenes = [sanitize_scene(scene) for scene in asset.get("scenes", [])]
+def synthesize_voiceover(settings: Settings, text: str, output_path: Path) -> Path | None:
+    if settings.tts_provider.lower() != "openai":
+        return None
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for voiceover generation")
+    if not text.strip():
+        return None
+
+    response = httpx.post(
+        "https://api.openai.com/v1/audio/speech",
+        headers={"authorization": f"Bearer {settings.openai_api_key}"},
+        json={
+            "model": settings.tts_model,
+            "voice": settings.tts_voice,
+            "input": text,
+            "response_format": "mp3",
+        },
+        timeout=60,
+    )
+    if not response.is_success:
+        raise RuntimeError(f"OpenAI TTS failed: {response.text[:500]}")
+    output_path.write_bytes(response.content)
+    return output_path
+
+
+def render_video(asset: dict[str, Any], output_dir: Path, settings: Settings | None = None) -> RenderedVideo:
+    scenes = [sanitize_scene(scene) for scene in asset.get("scenes", [])[:4]]
     if not scenes:
         raise RuntimeError("video asset has no scenes")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     concat_path = output_dir / "concat.txt"
+    silent_video_file = output_dir / "study-video-silent.mp4"
     video_file = output_dir / "study-video.mp4"
     concat_lines: list[str] = []
     total_duration = 0
@@ -145,7 +187,7 @@ def render_video(asset: dict[str, Any], output_dir: Path) -> RenderedVideo:
             "+faststart",
             "-r",
             "30",
-            str(video_file),
+            str(silent_video_file),
         ],
         capture_output=True,
         text=True,
@@ -153,4 +195,49 @@ def render_video(asset: dict[str, Any], output_dir: Path) -> RenderedVideo:
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr[-500:] or "ffmpeg failed")
-    return RenderedVideo(path=video_file, duration_seconds=total_duration)
+
+    voiceover_path = None
+    if settings:
+        voiceover_path = synthesize_voiceover(settings, scene_narration(asset), output_dir / "voiceover.mp3")
+    if not voiceover_path:
+        silent_video_file.replace(video_file)
+        return RenderedVideo(
+            path=video_file,
+            duration_seconds=min(total_duration, MAX_VIDEO_SECONDS),
+            narration_available=False,
+        )
+
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(silent_video_file),
+            "-i",
+            str(voiceover_path),
+            "-t",
+            str(MAX_VIDEO_SECONDS),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            str(video_file),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[-500:] or "ffmpeg audio mux failed")
+    return RenderedVideo(
+        path=video_file,
+        duration_seconds=min(total_duration, MAX_VIDEO_SECONDS),
+        narration_available=True,
+    )

@@ -93,6 +93,7 @@ export type QuizQuestion = SourcePages & {
 export type VideoScene = {
   template: string;
   text: string[];
+  narration?: string;
   duration_seconds: number;
 };
 

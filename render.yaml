@@ -33,6 +33,14 @@ services:
         value: "10000"
       - key: MAX_EXTRACTED_CHARS
         value: "60000"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TTS_PROVIDER
+        value: openai
+      - key: TTS_MODEL
+        value: gpt-4o-mini-tts
+      - key: TTS_VOICE
+        value: alloy
   - type: worker
     name: smartlearn-worker
     runtime: docker
