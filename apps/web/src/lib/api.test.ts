@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { documentStatusSchema } from "./api";
+import { documentStatusSchema, getApiBaseUrl } from "./api";
 
 describe("documentStatusSchema", () => {
   it("accepts a valid status response", () => {
@@ -13,5 +13,19 @@ describe("documentStatusSchema", () => {
       package_id: null,
     });
     expect(parsed.progress).toBe(70);
+  });
+});
+
+describe("getApiBaseUrl", () => {
+  it("adds the api version prefix when Render root is configured", () => {
+    expect(getApiBaseUrl("https://smartlearn-vpiy.onrender.com")).toBe(
+      "https://smartlearn-vpiy.onrender.com/api/v1",
+    );
+  });
+
+  it("keeps an existing api version prefix", () => {
+    expect(getApiBaseUrl("https://smartlearn-vpiy.onrender.com/api/v1/")).toBe(
+      "https://smartlearn-vpiy.onrender.com/api/v1",
+    );
   });
 });

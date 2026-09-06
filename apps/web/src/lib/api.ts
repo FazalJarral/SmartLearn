@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
+export function getApiBaseUrl(value: string | undefined = import.meta.env.VITE_API_BASE_URL) {
+  const baseUrl = value?.replace(/\/+$/, "") ?? "http://localhost:8000/api/v1";
+  return baseUrl.endsWith("/api/v1") ? baseUrl : `${baseUrl}/api/v1`;
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   try {
