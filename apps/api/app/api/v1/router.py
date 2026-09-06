@@ -1,5 +1,7 @@
 import hashlib
+import tempfile
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -26,6 +28,7 @@ from app.services.pdf_validation import validate_pdf_upload
 from app.services.quota import next_utc_midnight, remaining_uploads
 from app.services.scoring import is_correct_answer
 from app.services.supabase_client import Actor, SupabaseService
+from app.services.video_rendering import build_transcript, render_video, transcript_path, video_path
 
 router = APIRouter()
 
@@ -228,6 +231,7 @@ async def _generate_and_persist_document(
             study_package.model_dump(exclude_none=True),
             settings.generation_provider,
         )
+        await _render_package_video(service, document_id)
         await service.update("documents", document_id, {"status": ProcessingStage.CONTENT_READY.value})
         await service.update(
             "processing_jobs",
@@ -264,6 +268,69 @@ async def _generate_and_persist_document(
                 "error_code": "generation_failed",
                 "user_message": "Study-material generation failed. Try again.",
                 "diagnostic_detail": "unexpected content generation failure after upload acceptance",
+            },
+        )
+
+
+async def _render_package_video(service: SupabaseService, document_id: str) -> None:
+    package_rows = await service.select(
+        "learning_packages",
+        {"select": "id", "document_id": f"eq.{document_id}", "limit": "1"},
+    )
+    if not package_rows:
+        return
+    video_rows = await service.select(
+        "video_assets",
+        {
+            "select": "id,package_id,status,plan_title,narration,scenes",
+            "package_id": f"eq.{package_rows[0]['id']}",
+            "limit": "1",
+        },
+    )
+    if not video_rows:
+        return
+    asset = video_rows[0]
+    await service.update(
+        "video_assets",
+        asset["id"],
+        {
+            "status": ProcessingStage.RENDERING_VIDEO.value,
+            "user_message": "Rendering the study video.",
+            "updated_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    try:
+        transcript_storage_path = transcript_path(asset)
+        await service.storage_upload(transcript_storage_path, build_transcript(asset), "text/plain")
+        with tempfile.TemporaryDirectory() as directory:
+            rendered = render_video(asset, Path(directory))
+            video_storage_path = video_path(asset)
+            await service.storage_upload(video_storage_path, rendered.path.read_bytes(), "video/mp4")
+        await service.update(
+            "video_assets",
+            asset["id"],
+            {
+                "status": ProcessingStage.COMPLETED.value,
+                "video_storage_path": video_storage_path,
+                "transcript_storage_path": transcript_storage_path,
+                "duration_seconds": rendered.duration_seconds,
+                "narration_available": False,
+                "error_code": None,
+                "user_message": "Video is ready.",
+                "diagnostic_detail": "Rendered silent scene-based MP4 from the generated video plan.",
+                "updated_at": datetime.now(UTC).isoformat(),
+            },
+        )
+    except Exception as exc:
+        await service.update(
+            "video_assets",
+            asset["id"],
+            {
+                "status": ProcessingStage.FAILED.value,
+                "error_code": "video_render_failed",
+                "user_message": "Video rendering failed. The study material is still ready.",
+                "diagnostic_detail": str(exc)[:500],
+                "updated_at": datetime.now(UTC).isoformat(),
             },
         )
 
