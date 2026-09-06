@@ -159,12 +159,12 @@ async def _persist_study_package(
         "video_assets",
         {
             "package_id": package["id"],
-            "status": ProcessingStage.PARTIAL_SUCCESS.value,
+            "status": ProcessingStage.CONTENT_READY.value,
             "plan_title": content["video"]["title"],
             "narration": content["video"]["narration"],
             "scenes": content["video"]["scenes"],
             "narration_available": False,
-            "user_message": "Video rendering is not enabled yet.",
+            "user_message": "Video rendering is queued.",
         },
     )
     await service.upsert(
@@ -662,6 +662,31 @@ async def video_download_url(
     return SignedUrlResponse(
         url=await service.storage_signed_url(
             video_asset["video_storage_path"], expires_in=expires_in, download=True
+        ),
+        expires_in=expires_in,
+    )
+
+
+@router.get(
+    "/video-assets/{video_asset_id}/transcript-url",
+    response_model=SignedUrlResponse,
+    tags=["learning"],
+)
+async def video_transcript_url(
+    video_asset_id: UUID,
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+    x_guest_session: Annotated[str | None, Header(alias="X-Guest-Session")] = None,
+) -> SignedUrlResponse:
+    settings = get_settings()
+    service = SupabaseService(settings)
+    actor = await service.actor_from_headers(authorization, x_guest_session)
+    video_asset = await _authorized_video_asset(service, actor, video_asset_id)
+    if not video_asset.get("transcript_storage_path"):
+        raise ApiError("transcript_not_available", "The video transcript is not available yet.", 404)
+    expires_in = 300
+    return SignedUrlResponse(
+        url=await service.storage_signed_url(
+            video_asset["transcript_storage_path"], expires_in=expires_in, download=True
         ),
         expires_in=expires_in,
     )

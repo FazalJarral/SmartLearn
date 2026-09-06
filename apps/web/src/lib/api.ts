@@ -240,7 +240,7 @@ export async function completeQuizAttempt(
 
 export async function getVideoUrl(
   videoAssetId: string,
-  mode: "playback" | "download",
+  mode: "playback" | "download" | "transcript",
   accessToken?: string | null,
   guestSession?: string | null,
 ): Promise<string> {

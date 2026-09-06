@@ -113,6 +113,15 @@ function VideoPlan({ accessToken, guestSession, packageTitle, video, videoAssetI
       window.location.href = url;
     },
   });
+  const transcript = useMutation({
+    mutationFn: () => {
+      if (!videoAssetId) throw new Error("Video asset is not ready");
+      return getVideoUrl(videoAssetId, "transcript", accessToken, guestSession);
+    },
+    onSuccess: (url) => {
+      window.location.href = url;
+    },
+  });
 
   return (
     <article className="space-y-5">
@@ -129,6 +138,9 @@ function VideoPlan({ accessToken, guestSession, packageTitle, video, videoAssetI
             <button className="rounded-md bg-sage px-3 py-2 text-sm font-semibold text-white" onClick={() => download.mutate()} type="button">
               Download
             </button>
+            <button className="rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white" onClick={() => transcript.mutate()} type="button">
+              Transcript
+            </button>
           </div>
         </div>
         {playbackUrl ? (
@@ -138,6 +150,7 @@ function VideoPlan({ accessToken, guestSession, packageTitle, video, videoAssetI
         ) : null}
         {playback.error ? <p className="mt-3 text-sm text-slate-600">{playback.error.message}</p> : null}
         {download.error ? <p className="mt-3 text-sm text-slate-600">{download.error.message}</p> : null}
+        {transcript.error ? <p className="mt-3 text-sm text-slate-600">{transcript.error.message}</p> : null}
         <p className="mt-3 text-slate-700">{video.narration}</p>
       </div>
       <ol className="space-y-3">

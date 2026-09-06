@@ -33,3 +33,22 @@ services:
         value: "6000"
       - key: MAX_EXTRACTED_CHARS
         value: "60000"
+  - type: worker
+    name: smartlearn-worker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: smartlearn-private
+      - key: WORKER_POLL_INTERVAL_SECONDS
+        value: "10"
+      - key: JOB_LEASE_SECONDS
+        value: "300"

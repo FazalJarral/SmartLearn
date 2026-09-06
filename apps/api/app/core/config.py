@@ -29,6 +29,20 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
 
+    def runtime_errors(self) -> list[str]:
+        errors: list[str] = []
+        if not self.supabase_url:
+            errors.append("SUPABASE_URL is required")
+        if not self.supabase_anon_key:
+            errors.append("SUPABASE_ANON_KEY is required")
+        if not self.supabase_service_role_key:
+            errors.append("SUPABASE_SERVICE_ROLE_KEY is required")
+        if self.generation_provider.lower() == "deepseek" and not self.deepseek_api_key:
+            errors.append("DEEPSEEK_API_KEY is required when GENERATION_PROVIDER=deepseek")
+        if not self.cors_origins:
+            errors.append("API_CORS_ORIGINS must contain at least one origin")
+        return errors
+
 
 @lru_cache
 def get_settings() -> Settings:

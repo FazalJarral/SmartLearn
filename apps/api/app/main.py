@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import router as v1_router
 from app.core.config import get_settings
+from app.core.errors import ApiError
 from app.core.errors import install_error_handlers
 
 
@@ -30,6 +31,10 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready", tags=["health"])
     async def ready() -> dict[str, str]:
+        if settings.environment.lower() == "production":
+            errors = settings.runtime_errors()
+            if errors:
+                raise ApiError("runtime_not_configured", "Server configuration is incomplete.", 503, {"errors": errors})
         return {"status": "ok", "mode": settings.generation_provider}
 
     return app
