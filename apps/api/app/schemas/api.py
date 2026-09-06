@@ -46,6 +46,10 @@ class LearningPackageResponse(BaseModel):
     document_id: UUID
     content: StudyPackage
     video_asset_id: UUID | None = None
+    video_status: ProcessingStage | None = None
+    video_message: str | None = None
+    video_available: bool = False
+    transcript_available: bool = False
 
 
 class SignedUrlResponse(BaseModel):

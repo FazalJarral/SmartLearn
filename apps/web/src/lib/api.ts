@@ -117,6 +117,10 @@ export type LearningPackageResponse = {
   document_id: string;
   content: LearningPackageContent;
   video_asset_id: string | null;
+  video_status: string | null;
+  video_message: string | null;
+  video_available: boolean;
+  transcript_available: boolean;
 };
 
 export async function createGuestSession() {

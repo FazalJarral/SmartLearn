@@ -1,11 +1,14 @@
 import asyncio
 import logging
+import tempfile
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from worker.config import get_settings
 from worker.scene_sanitizer import sanitize_scene
 from worker.supabase_client import WorkerSupabaseClient
+from worker.video_renderer import render_video, video_path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("smartlearn.worker")
@@ -49,15 +52,22 @@ async def process_video_asset(client: WorkerSupabaseClient, asset: dict[str, Any
     try:
         path = transcript_path(asset)
         await client.storage_upload(path, build_transcript(asset), "text/plain")
+        with tempfile.TemporaryDirectory() as directory:
+            rendered = render_video(asset, output_dir=Path(directory))
+            mp4_path = video_path(asset)
+            await client.storage_upload(mp4_path, rendered.path.read_bytes(), "video/mp4")
         await client.update_by_id(
             "video_assets",
             asset["id"],
             {
-                "status": "partial_success",
+                "status": "completed",
+                "video_storage_path": mp4_path,
                 "transcript_storage_path": path,
+                "duration_seconds": rendered.duration_seconds,
                 "narration_available": False,
-                "user_message": "Study material is ready. Video rendering is not enabled for this deployment.",
-                "diagnostic_detail": "Worker persisted the validated video transcript; no renderer is configured.",
+                "error_code": None,
+                "user_message": "Video is ready.",
+                "diagnostic_detail": "Rendered silent scene-based MP4 from the generated video plan.",
                 "updated_at": datetime.now(UTC).isoformat(),
             },
         )

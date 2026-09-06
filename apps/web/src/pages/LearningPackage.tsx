@@ -25,6 +25,10 @@ export function LearningPackage() {
     queryKey: ["package", packageId, session?.access_token, guestSession],
     queryFn: () => getPackage(packageId, session?.access_token, guestSession),
     enabled: Boolean(packageId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.video_status;
+      return status && !["completed", "partial_success", "failed"].includes(status) ? 3000 : false;
+    },
   });
 
   if (result.isLoading) return <p>Loading package...</p>;
@@ -76,6 +80,10 @@ export function LearningPackage() {
             packageTitle={content.title}
             video={content.video}
             videoAssetId={result.data.video_asset_id}
+            videoAvailable={result.data.video_available}
+            videoMessage={result.data.video_message}
+            videoStatus={result.data.video_status}
+            transcriptAvailable={result.data.transcript_available}
           />
         )}
       </div>
@@ -93,9 +101,23 @@ type VideoPlanProps = {
     scenes: Array<{ template: string; text: string[]; duration_seconds: number }>;
   };
   videoAssetId?: string | null;
+  videoStatus?: string | null;
+  videoMessage?: string | null;
+  videoAvailable: boolean;
+  transcriptAvailable: boolean;
 };
 
-function VideoPlan({ accessToken, guestSession, packageTitle, video, videoAssetId }: VideoPlanProps) {
+function VideoPlan({
+  accessToken,
+  guestSession,
+  packageTitle,
+  video,
+  videoAssetId,
+  videoAvailable,
+  videoMessage,
+  videoStatus,
+  transcriptAvailable,
+}: VideoPlanProps) {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const playback = useMutation({
     mutationFn: () => {
@@ -132,17 +154,37 @@ function VideoPlan({ accessToken, guestSession, packageTitle, video, videoAssetI
             <p className="mt-1 text-sm text-slate-600">{packageTitle}</p>
           </div>
           <div className="flex gap-2">
-            <button className="rounded-md bg-mist px-3 py-2 text-sm font-semibold" onClick={() => playback.mutate()} type="button">
+            <button
+              className="rounded-md bg-sage px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!videoAvailable}
+              onClick={() => playback.mutate()}
+              type="button"
+            >
               Play MP4
             </button>
-            <button className="rounded-md bg-sage px-3 py-2 text-sm font-semibold text-white" onClick={() => download.mutate()} type="button">
+            <button
+              className="rounded-md bg-sage px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!videoAvailable}
+              onClick={() => download.mutate()}
+              type="button"
+            >
               Download
             </button>
-            <button className="rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white" onClick={() => transcript.mutate()} type="button">
+            <button
+              className="rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!transcriptAvailable}
+              onClick={() => transcript.mutate()}
+              type="button"
+            >
               Transcript
             </button>
           </div>
         </div>
+        {videoStatus ? (
+          <p className="mt-3 text-sm text-slate-600">
+            {videoStatus.replace("_", " ")}{videoMessage ? ` - ${videoMessage}` : ""}
+          </p>
+        ) : null}
         {playbackUrl ? (
           <video className="mt-4 w-full rounded-md border border-mist" controls src={playbackUrl}>
             <track kind="captions" />

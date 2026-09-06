@@ -406,7 +406,7 @@ async def upload_document(
         "original_filename": validation.filename,
         "source_storage_path": source_storage_path,
         "size_bytes": validation.size_bytes,
-        "page_count": extracted.page_count,
+        "page_count": extracted.processed_page_count,
         "checksum_sha256": hashlib.sha256(data).hexdigest(),
         "status": ProcessingStage.GENERATING_CONTENT.value,
     }
@@ -630,7 +630,7 @@ async def learning_package(
     video_rows = await service.select(
         "video_assets",
         {
-            "select": "id,status,user_message,narration_available,plan_title,narration,scenes",
+            "select": "id,status,user_message,narration_available,plan_title,narration,scenes,video_storage_path,transcript_storage_path",
             "package_id": f"eq.{package_id}",
             "limit": "1",
         },
@@ -663,6 +663,10 @@ async def learning_package(
         document_id=package["document_id"],
         content=content,
         video_asset_id=video_rows[0]["id"] if video_rows else None,
+        video_status=ProcessingStage(video_rows[0]["status"]) if video_rows else None,
+        video_message=video_rows[0].get("user_message") if video_rows else None,
+        video_available=bool(video_rows and video_rows[0].get("video_storage_path")),
+        transcript_available=bool(video_rows and video_rows[0].get("transcript_storage_path")),
     )
 
 
