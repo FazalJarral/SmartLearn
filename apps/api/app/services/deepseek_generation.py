@@ -47,6 +47,20 @@ SCHEMA_EXAMPLE = {
 }
 
 
+def normalize_study_package_payload(payload: dict) -> dict:
+    scenes = payload.get("video", {}).get("scenes", [])
+    if isinstance(scenes, list):
+        for scene in scenes:
+            if not isinstance(scene, dict) or "duration_seconds" not in scene:
+                continue
+            try:
+                duration = int(scene["duration_seconds"])
+            except (TypeError, ValueError):
+                continue
+            scene["duration_seconds"] = min(max(duration, 3), 12)
+    return payload
+
+
 @dataclass(frozen=True)
 class GenerationInput:
     filename: str
@@ -79,6 +93,7 @@ Bounds:
 - 5 to 10 quiz questions
 - exactly 4 quiz options and one correct_option_index from 0 to 3
 - video narration should be suitable for 30 to 60 seconds
+- each video scene duration_seconds must be an integer from 3 to 12
 - video scene template must be one of title, bullet_list, comparison, process, definition
 
 Document metadata:
@@ -118,6 +133,7 @@ class DeepSeekStudyPackageGenerator(StudyPackageGenerator):
             raw = await self._chat(messages)
             try:
                 parsed = extract_json_object(raw)
+                parsed = normalize_study_package_payload(parsed)
                 return StudyPackage.model_validate(parsed)
             except (json.JSONDecodeError, ValidationError) as exc:
                 last_error = exc

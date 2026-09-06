@@ -25,6 +25,7 @@ class DocumentStatusResponse(BaseModel):
     stage: ProcessingStage
     progress: int = Field(ge=0, le=100)
     message: str
+    warnings: list[str] = Field(default_factory=list)
     error_code: str | None = None
     package_id: UUID | None = None
 

@@ -345,7 +345,7 @@ async def upload_document(
         study_package = await generator.generate(
             GenerationInput(
                 filename=validation.filename,
-                page_count=extracted.page_count,
+                page_count=extracted.processed_page_count,
                 page_aware_text=extracted.combined_text,
             )
         )
@@ -379,6 +379,7 @@ async def upload_document(
         stage=ProcessingStage.CONTENT_READY,
         progress=70,
         message="Document accepted and study material persisted. Video rendering is queued.",
+        warnings=[extracted.truncation_message] if extracted.truncation_message else [],
         package_id=package["id"],
     )
 
@@ -499,7 +500,7 @@ async def retry_document(
         study_package = await generator.generate(
             GenerationInput(
                 filename=document["original_filename"],
-                page_count=extracted.page_count,
+                page_count=extracted.processed_page_count,
                 page_aware_text=extracted.combined_text,
             )
         )

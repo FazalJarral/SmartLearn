@@ -46,7 +46,7 @@ export function Upload() {
       <label className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-sage bg-white p-10 text-center">
         <UploadCloud aria-hidden="true" className="h-10 w-10 text-sage" />
         <span className="mt-3 font-semibold">Select or drag a text-based PDF</span>
-        <span className="mt-1 text-sm text-slate-600">Maximum 15 MiB and 20 pages by default.</span>
+        <span className="mt-1 text-sm text-slate-600">Maximum 15 MiB. For longer PDFs, we process the first 20 pages.</span>
         <input
           className="sr-only"
           type="file"
@@ -65,9 +65,16 @@ export function Upload() {
       </button>
       {upload.error ? <p className="mt-4 text-sm font-medium text-red-700">{upload.error.message}</p> : null}
       {upload.data?.package_id ? (
-        <p className="mt-4 text-sm">
-          {upload.data.message} <Link className="font-semibold text-sage underline" to={`/packages/${upload.data.package_id}`}>Open package</Link>
-        </p>
+        <div className="mt-4 space-y-2 text-sm">
+          {upload.data.warnings.map((warning) => (
+            <p key={warning} className="font-medium text-amber-700">
+              {warning}
+            </p>
+          ))}
+          <p>
+            {upload.data.message} <Link className="font-semibold text-sage underline" to={`/packages/${upload.data.package_id}`}>Open package</Link>
+          </p>
+        </div>
       ) : null}
     </section>
   );

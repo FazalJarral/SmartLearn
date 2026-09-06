@@ -23,6 +23,7 @@ export const documentStatusSchema = z.object({
   stage: z.string(),
   progress: z.number(),
   message: z.string(),
+  warnings: z.array(z.string()).default([]),
   error_code: z.string().nullable(),
   package_id: z.string().nullable(),
 });

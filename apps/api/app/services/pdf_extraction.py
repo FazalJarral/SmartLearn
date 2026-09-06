@@ -18,10 +18,26 @@ class ExtractedPage:
 class ExtractedDocument:
     page_count: int
     pages: list[ExtractedPage]
+    max_pages: int
+    was_truncated: bool
 
     @property
     def combined_text(self) -> str:
         return "\n\n".join(f"[Page {page.page_number}]\n{page.text}" for page in self.pages)
+
+    @property
+    def processed_page_count(self) -> int:
+        return min(self.page_count, self.max_pages)
+
+    @property
+    def truncation_message(self) -> str | None:
+        if not self.was_truncated:
+            return None
+        page_label = "page" if self.max_pages == 1 else "pages"
+        return (
+            f"This PDF has {self.page_count} pages. SmartLearn processed the first "
+            f"{self.max_pages} {page_label} for now."
+        )
 
 
 def normalize_text(value: str) -> str:
@@ -60,10 +76,12 @@ def extract_text_from_pdf(data: bytes, max_pages: int, max_chars: int) -> Extrac
             raise ApiError("encrypted_pdf", "Password-protected PDFs are not supported.", 422)
         if document.page_count == 0:
             raise ApiError("empty_pdf", "The PDF has no pages.", 422)
-        if document.page_count > max_pages:
-            raise ApiError("too_many_pages", f"The PDF exceeds the {max_pages}-page limit.", 413)
+        was_truncated = document.page_count > max_pages
 
-        raw_pages = [normalize_text(page.get_text("text")) for page in document]
+        raw_pages = [
+            normalize_text(document[index].get_text("text"))
+            for index in range(min(document.page_count, max_pages))
+        ]
         cleaned_pages = remove_repeated_headers_footers(raw_pages)
         pages = [
             ExtractedPage(page_number=index, text=text)
@@ -86,6 +104,11 @@ def extract_text_from_pdf(data: bytes, max_pages: int, max_chars: int) -> Extrac
             bounded_text = page.text[:remaining]
             bounded_pages.append(ExtractedPage(page.page_number, bounded_text))
             combined_chars += len(bounded_text)
-        return ExtractedDocument(page_count=document.page_count, pages=bounded_pages)
+        return ExtractedDocument(
+            page_count=document.page_count,
+            pages=bounded_pages,
+            max_pages=max_pages,
+            was_truncated=was_truncated,
+        )
     finally:
         document.close()
