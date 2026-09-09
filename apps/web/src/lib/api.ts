@@ -293,3 +293,18 @@ export async function getVideoUrl(
   const body = z.object({ url: z.string(), expires_in: z.number() }).parse(await response.json());
   return body.url;
 }
+
+export async function retryVideo(
+  videoAssetId: string,
+  accessToken?: string | null,
+  guestSession?: string | null,
+): Promise<void> {
+  const response = await apiFetch(`${API_BASE_URL}/video-assets/${videoAssetId}/retry`, {
+    method: "POST",
+    headers: authHeaders(accessToken, guestSession),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? "Unable to retry video rendering");
+  }
+}

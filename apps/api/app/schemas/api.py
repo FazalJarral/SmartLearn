@@ -57,6 +57,12 @@ class SignedUrlResponse(BaseModel):
     expires_in: int
 
 
+class VideoRetryResponse(BaseModel):
+    video_asset_id: UUID
+    status: ProcessingStage
+    message: str
+
+
 class QuizAnswerIn(BaseModel):
     question_id: UUID
     selected_index: int = Field(ge=0, le=3)

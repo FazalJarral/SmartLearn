@@ -195,7 +195,7 @@ def _render_with_manim(plans: list[dict[str, Any]], output_dir: Path) -> Path:
                 group = VGroup(left, right, lt, rt, shared, extras)
                 self.play(Create(left), FadeIn(lt, shift=RIGHT), run_time=0.8)
                 self.play(Create(right), FadeIn(rt, shift=LEFT), run_time=0.8)
-                self.play(FadeIn(shared, scale=1.3), FadeIn(extras), run_time=0.8)
+                self.play(FadeIn(shared), FadeIn(extras), run_time=0.8)
                 return group, 2.4
 
             if plan["template"] == "cause_effect":

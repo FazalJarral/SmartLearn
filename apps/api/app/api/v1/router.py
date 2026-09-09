@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import tempfile
 from datetime import UTC, datetime
@@ -20,6 +21,7 @@ from app.schemas.api import (
     QuizAttemptResponse,
     SignedUrlResponse,
     UsageResponse,
+    VideoRetryResponse,
 )
 from app.services.deepseek_generation import GenerationInput, get_generator
 from app.services.mock_generation import mock_study_package
@@ -297,13 +299,16 @@ async def _render_package_video(service: SupabaseService, document_id: str) -> N
     )
     if not video_rows:
         return
-    asset = video_rows[0]
+    await _render_video_asset(service, video_rows[0])
+
+
+async def _render_video_asset(service: SupabaseService, asset: dict) -> None:
     await service.update(
         "video_assets",
         asset["id"],
         {
             "status": ProcessingStage.RENDERING_VIDEO.value,
-                "user_message": "Animating the concept with Manim.",
+            "user_message": "Animating the concept with Manim.",
             "updated_at": datetime.now(UTC).isoformat(),
         },
     )
@@ -311,7 +316,9 @@ async def _render_package_video(service: SupabaseService, document_id: str) -> N
         transcript_storage_path = transcript_path(asset)
         await service.storage_upload(transcript_storage_path, build_transcript(asset), "text/plain")
         with tempfile.TemporaryDirectory() as directory:
-            rendered = render_video(asset, Path(directory), get_settings())
+            rendered = await asyncio.to_thread(
+                render_video, asset, Path(directory), get_settings()
+            )
             video_storage_path = video_path(asset)
             await service.storage_upload(video_storage_path, rendered.path.read_bytes(), "video/mp4")
         await service.update(
@@ -341,6 +348,20 @@ async def _render_package_video(service: SupabaseService, document_id: str) -> N
                 "updated_at": datetime.now(UTC).isoformat(),
             },
         )
+
+
+async def _retry_video_asset(video_asset_id: str) -> None:
+    service = SupabaseService(get_settings())
+    rows = await service.select(
+        "video_assets",
+        {
+            "select": "id,package_id,status,plan_title,narration,scenes",
+            "id": f"eq.{video_asset_id}",
+            "limit": "1",
+        },
+    )
+    if rows:
+        await _render_video_asset(service, rows[0])
 
 
 @router.post("/guest/session", response_model=GuestSessionResponse, tags=["guest"])
@@ -789,6 +810,46 @@ async def video_playback_url(
     return SignedUrlResponse(
         url=await service.storage_signed_url(video_asset["video_storage_path"], expires_in=expires_in),
         expires_in=expires_in,
+    )
+
+
+@router.post(
+    "/video-assets/{video_asset_id}/retry",
+    response_model=VideoRetryResponse,
+    tags=["learning"],
+)
+async def retry_video_render(
+    video_asset_id: UUID,
+    background_tasks: BackgroundTasks,
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+    x_guest_session: Annotated[str | None, Header(alias="X-Guest-Session")] = None,
+) -> VideoRetryResponse:
+    settings = get_settings()
+    service = SupabaseService(settings)
+    actor = await service.actor_from_headers(authorization, x_guest_session)
+    video_asset = await _authorized_video_asset(service, actor, video_asset_id)
+    if video_asset["status"] != ProcessingStage.FAILED.value:
+        raise ApiError(
+            "video_retry_not_available",
+            "Retry is only available after video rendering fails.",
+            409,
+        )
+    await service.update(
+        "video_assets",
+        str(video_asset_id),
+        {
+            "status": ProcessingStage.CONTENT_READY.value,
+            "error_code": None,
+            "user_message": "Video retry is queued.",
+            "diagnostic_detail": None,
+            "updated_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    background_tasks.add_task(_retry_video_asset, str(video_asset_id))
+    return VideoRetryResponse(
+        video_asset_id=video_asset_id,
+        status=ProcessingStage.CONTENT_READY,
+        message="Video retry queued.",
     )
 
 

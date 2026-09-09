@@ -8,6 +8,7 @@ import {
   createQuizAttempt,
   getVideoUrl,
   getPackage,
+  retryVideo,
   type QuizAnswerResult,
   type QuizAttempt,
   type QuizQuestion,
@@ -100,6 +101,7 @@ export function LearningPackage() {
             videoMessage={result.data.video_message}
             videoStatus={result.data.video_status}
             transcriptAvailable={result.data.transcript_available}
+            onRetry={() => void result.refetch()}
           />
         )}
       </div>
@@ -128,6 +130,7 @@ type VideoPlanProps = {
   videoMessage?: string | null;
   videoAvailable: boolean;
   transcriptAvailable: boolean;
+  onRetry: () => void;
 };
 
 function VideoPlan({
@@ -140,6 +143,7 @@ function VideoPlan({
   videoMessage,
   videoStatus,
   transcriptAvailable,
+  onRetry,
 }: VideoPlanProps) {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const playback = useMutation({
@@ -165,6 +169,16 @@ function VideoPlan({
     },
     onSuccess: (url) => {
       window.location.href = url;
+    },
+  });
+  const retry = useMutation({
+    mutationFn: () => {
+      if (!videoAssetId) throw new Error("Video asset is not ready");
+      return retryVideo(videoAssetId, accessToken, guestSession);
+    },
+    onSuccess: () => {
+      setPlaybackUrl(null);
+      onRetry();
     },
   });
 
@@ -201,6 +215,16 @@ function VideoPlan({
             >
               Transcript
             </button>
+            {videoStatus === "failed" ? (
+              <button
+                className="rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={retry.isPending}
+                onClick={() => retry.mutate()}
+                type="button"
+              >
+                {retry.isPending ? "Retrying..." : "Retry video"}
+              </button>
+            ) : null}
           </div>
         </div>
         {videoStatus ? (
@@ -216,6 +240,7 @@ function VideoPlan({
         {playback.error ? <p className="mt-3 text-sm text-slate-600">{playback.error.message}</p> : null}
         {download.error ? <p className="mt-3 text-sm text-slate-600">{download.error.message}</p> : null}
         {transcript.error ? <p className="mt-3 text-sm text-slate-600">{transcript.error.message}</p> : null}
+        {retry.error ? <p className="mt-3 text-sm text-slate-600">{retry.error.message}</p> : null}
         <p className="mt-3 text-slate-700">{video.narration}</p>
       </div>
       <ol className="space-y-3">

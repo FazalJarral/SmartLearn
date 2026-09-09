@@ -123,7 +123,7 @@ def render_video(asset: dict[str, Any], output_dir: Path) -> RenderedVideo:
                 group = VGroup(left, right, lt, rt, shared)
                 self.play(Create(left), FadeIn(lt, shift=RIGHT), run_time=0.8)
                 self.play(Create(right), FadeIn(rt, shift=LEFT), run_time=0.8)
-                self.play(FadeIn(shared, scale=1.3), run_time=0.8)
+                self.play(FadeIn(shared), run_time=0.8)
                 return group, 2.4
             if kind == "cause_effect":
                 cause, effect = box(items[0], width=3.4), box(items[1], gold, "#f6d78f", 3.4)
