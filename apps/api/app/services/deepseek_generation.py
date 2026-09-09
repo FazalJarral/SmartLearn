@@ -220,6 +220,7 @@ class DeepSeekStudyPackageGenerator(StudyPackageGenerator):
             "model": self.settings.deepseek_model,
             "messages": messages,
             "response_format": {"type": "json_object"},
+            "thinking": {"type": "disabled"},
             "max_tokens": self.settings.deepseek_max_tokens,
             "stream": False,
         }
@@ -258,9 +259,16 @@ class DeepSeekStudyPackageGenerator(StudyPackageGenerator):
                     503,
                 )
             raise ApiError("deepseek_failed", "DeepSeek returned an error. Try again shortly.", 502)
-        content = response.json().get("choices", [{}])[0].get("message", {}).get("content")
+        body = response.json()
+        choice = body.get("choices", [{}])[0]
+        content = choice.get("message", {}).get("content")
         if not content:
-            raise ApiError("deepseek_empty_response", "DeepSeek returned an empty response. Try again.", 502)
+            raise ApiError(
+                "deepseek_empty_response",
+                "DeepSeek returned an empty response. Try again.",
+                502,
+                {"finish_reason": choice.get("finish_reason") or "unknown"},
+            )
         return content
 
 
