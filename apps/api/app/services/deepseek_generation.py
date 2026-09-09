@@ -180,8 +180,19 @@ class DeepSeekStudyPackageGenerator(StudyPackageGenerator):
             {"role": "user", "content": build_user_prompt(input_data)},
         ]
         last_error: Exception | None = None
-        for attempt in range(2):
-            raw = await self._chat(messages)
+        for attempt in range(3):
+            try:
+                raw = await self._chat(messages)
+            except ApiError as exc:
+                transient_codes = {
+                    "deepseek_empty_response",
+                    "deepseek_timeout",
+                    "deepseek_unavailable",
+                    "deepseek_rate_limited",
+                }
+                if exc.code in transient_codes and attempt < 2:
+                    continue
+                raise
             try:
                 parsed = extract_json_object(raw)
                 parsed = normalize_study_package_payload(parsed)
@@ -195,7 +206,7 @@ class DeepSeekStudyPackageGenerator(StudyPackageGenerator):
                         "content": "Return corrected json only. Preserve the SmartLearn schema and all required bounds.",
                     }
                 )
-                if attempt == 1:
+                if attempt == 2:
                     break
         raise ApiError(
             "invalid_ai_schema",

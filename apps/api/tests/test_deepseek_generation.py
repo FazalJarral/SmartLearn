@@ -1,4 +1,12 @@
-from app.services.deepseek_generation import extract_json_object, normalize_study_package_payload
+import asyncio
+
+from app.core.errors import ApiError
+from app.services.deepseek_generation import (
+    DeepSeekStudyPackageGenerator,
+    GenerationInput,
+    extract_json_object,
+    normalize_study_package_payload,
+)
 
 
 def test_extract_json_object_accepts_plain_json():
@@ -30,3 +38,23 @@ def test_normalize_study_package_payload_caps_total_video_duration():
     normalized = normalize_study_package_payload(payload)
 
     assert sum(scene["duration_seconds"] for scene in normalized["video"]["scenes"]) == 90
+
+
+def test_generator_retries_transient_empty_response(monkeypatch):
+    generator = object.__new__(DeepSeekStudyPackageGenerator)
+    calls = 0
+
+    async def fake_chat(_messages):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise ApiError("deepseek_empty_response", "empty", 502)
+        from app.services.mock_generation import mock_study_package
+
+        return mock_study_package().model_dump_json()
+
+    monkeypatch.setattr(generator, "_chat", fake_chat)
+    result = asyncio.run(generator.generate(GenerationInput("lesson.pdf", 1, "lesson text")))
+
+    assert result.title == "Uploaded Document"
+    assert calls == 2
