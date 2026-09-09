@@ -92,8 +92,10 @@ export type QuizQuestion = SourcePages & {
 
 export type VideoScene = {
   template: string;
-  text: string[];
-  narration?: string;
+  heading: string;
+  visual_elements: string[];
+  connection_label?: string | null;
+  narration: string;
   duration_seconds: number;
 };
 
@@ -103,7 +105,18 @@ export type LearningPackageContent = {
   summary: {
     overview: string;
     key_points: KeyPoint[];
+    definitions: Array<SourcePages & { term: string; definition: string; example?: string | null }>;
   };
+  topics: Array<SourcePages & {
+    name: string;
+    description: string;
+    further_learning: Array<{
+      title: string;
+      resource_type: "article" | "video" | "course" | "practice" | "book";
+      search_query: string;
+      why_it_helps: string;
+    }>;
+  }>;
   flashcards: Flashcard[];
   quiz: QuizQuestion[];
   video: {

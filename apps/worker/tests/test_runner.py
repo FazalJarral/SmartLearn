@@ -16,7 +16,7 @@ def test_build_transcript_sanitizes_scene_text():
     asset = {
         "plan_title": "Intro",
         "narration": "Welcome.",
-        "scenes": [{"template": "title", "text": ["<unsafe>"], "duration_seconds": 6}],
+        "scenes": [{"template": "intro", "heading": "Intro", "visual_elements": ["<unsafe>", "Question"], "duration_seconds": 6}],
     }
     transcript = build_transcript(asset).decode("utf-8")
     assert "Intro" in transcript
@@ -34,16 +34,16 @@ def test_wrap_text_keeps_long_lines_bounded():
     assert all(len(line) <= 24 for line in lines)
 
 
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
+@pytest.mark.skipif(shutil.which("manim") is None, reason="Manim is not installed")
 def test_render_video_creates_mp4(tmp_path: Path):
     asset = {
         "id": "asset-1",
         "package_id": "package-1",
-        "scenes": [{"template": "title", "text": ["Intro", "Welcome"], "duration_seconds": 3}],
+        "scenes": [{"template": "intro", "heading": "Intro", "visual_elements": ["Intro", "Welcome"], "duration_seconds": 6}],
     }
 
     rendered = render_video(asset, tmp_path)
 
     assert rendered.path.exists()
     assert rendered.path.suffix == ".mp4"
-    assert rendered.duration_seconds == 3
+    assert rendered.duration_seconds == 6

@@ -1,6 +1,6 @@
 # SmartLearn
 
-SmartLearn is a responsive study app for university learners. A learner uploads a text-based academic PDF and receives a structured summary, flashcards, a self-marking quiz, and a queued video transcript/render artifact path.
+SmartLearn is a responsive study app for university learners. A learner uploads a text-based academic PDF and receives a structured summary with plain-language definitions, a topic inventory with further-learning suggestions, flashcards, a self-marking quiz, and an animated Manim explainer.
 
 The project is production-oriented: the API validates uploads, enforces quotas, stores private files in Supabase Storage, generates study material with DeepSeek when configured, persists normalized learning data, and hands queued video assets to a background worker.
 
@@ -17,7 +17,7 @@ The project is production-oriented: the API validates uploads, enforces quotas, 
 - Node.js 22+
 - Python 3.12 for target deployment. Python 3.13 is acceptable for local scaffold tests until pinned dependencies require 3.12.
 - Supabase project for real auth/storage/database, or mock mode for local tests.
-- Optional video-rendering runtime if you extend the worker beyond transcript artifact generation.
+- Manim Community and its Cairo/Pango dependencies for animated video rendering (included in the Docker images).
 
 ## Setup
 

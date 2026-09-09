@@ -14,7 +14,7 @@ import {
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
-const tabs = ["Summary", "Flashcards", "Quiz", "Video"] as const;
+const tabs = ["Summary", "Topics", "Flashcards", "Quiz", "Video"] as const;
 
 export function LearningPackage() {
   const { packageId = "" } = useParams();
@@ -55,15 +55,31 @@ export function LearningPackage() {
       </div>
       <div className="mt-6">
         {tab === "Summary" && (
-          <article className="prose max-w-none">
+          <article className="max-w-4xl space-y-8">
+            <div className="prose max-w-none">
             <p>{content.summary.overview}</p>
             <ul>
               {content.summary.key_points.map((point: { heading: string; explanation: string }) => (
                 <li key={point.heading}><strong>{point.heading}:</strong> {point.explanation}</li>
               ))}
             </ul>
+            </div>
+            <section aria-labelledby="definitions-heading">
+              <h2 id="definitions-heading" className="text-2xl font-semibold">Simple definitions</h2>
+              <p className="mt-1 text-slate-600">The important terms from this material, explained plainly.</p>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                {content.summary.definitions.map((item) => (
+                  <div key={item.term} className="rounded-lg border border-mist bg-white p-4">
+                    <dt className="font-semibold text-ink">{item.term}</dt>
+                    <dd className="mt-1 text-slate-700">{item.definition}</dd>
+                    {item.example ? <dd className="mt-2 text-sm text-slate-600"><strong>Example:</strong> {item.example}</dd> : null}
+                  </div>
+                ))}
+              </dl>
+            </section>
           </article>
         )}
+        {tab === "Topics" && <Topics topics={content.topics} />}
         {tab === "Flashcards" && <Flashcards cards={content.flashcards} />}
         {tab === "Quiz" && (
           <Quiz
@@ -98,7 +114,14 @@ type VideoPlanProps = {
   video: {
     title: string;
     narration: string;
-    scenes: Array<{ template: string; text: string[]; duration_seconds: number }>;
+    scenes: Array<{
+      template: string;
+      heading: string;
+      visual_elements: string[];
+      connection_label?: string | null;
+      narration: string;
+      duration_seconds: number;
+    }>;
   };
   videoAssetId?: string | null;
   videoStatus?: string | null;
@@ -201,13 +224,65 @@ function VideoPlan({
             <p className="text-sm font-semibold uppercase text-slate-500">
               Scene {index + 1} - {scene.template.replace("_", " ")} - {scene.duration_seconds}s
             </p>
+            <h3 className="mt-1 font-semibold text-ink">{scene.heading}</h3>
+            <p className="mt-2 text-slate-700">{scene.narration}</p>
             <ul className="mt-2 list-disc pl-5 text-slate-700">
-              {scene.text.map((line) => <li key={line}>{line}</li>)}
+              {scene.visual_elements.map((line) => <li key={line}>{line}</li>)}
             </ul>
           </li>
         ))}
       </ol>
     </article>
+  );
+}
+
+type TopicsProps = {
+  topics: Array<{
+    name: string;
+    description: string;
+    source_pages: number[];
+    further_learning: Array<{
+      title: string;
+      resource_type: string;
+      search_query: string;
+      why_it_helps: string;
+    }>;
+  }>;
+};
+
+function Topics({ topics }: TopicsProps) {
+  return (
+    <section className="max-w-4xl space-y-4">
+      <div>
+        <h2 className="text-2xl font-semibold">Topics and further learning</h2>
+        <p className="mt-1 text-slate-600">Every topic in the material, plus focused suggestions for going deeper.</p>
+      </div>
+      {topics.map((topic) => (
+        <article key={topic.name} className="rounded-lg border border-mist bg-white p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-lg font-semibold">{topic.name}</h3>
+            {topic.source_pages.length ? <span className="text-xs text-slate-500">Pages {topic.source_pages.join(", ")}</span> : null}
+          </div>
+          <p className="mt-1 text-slate-700">{topic.description}</p>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {topic.further_learning.map((resource) => (
+              <li key={`${resource.title}-${resource.search_query}`} className="rounded-md bg-mist/50 p-3">
+                <span className="text-xs font-semibold uppercase text-slate-500">{resource.resource_type}</span>
+                <a
+                  className="mt-1 block font-semibold text-sage underline-offset-2 hover:underline"
+                  href={`https://www.google.com/search?q=${encodeURIComponent(resource.search_query)}`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {resource.title}
+                </a>
+                <p className="mt-1 text-sm text-slate-700">{resource.why_it_helps}</p>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </section>
   );
 }
 

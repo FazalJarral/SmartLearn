@@ -10,7 +10,7 @@ Create an account or sign in with Supabase Auth. From the dashboard, upload a PD
 
 ## Learning Package
 
-Use the Summary, Flashcards, Quiz, and Video tabs. Quiz answers show immediate feedback and a final stored score. MP4 download appears when video rendering succeeds.
+Use Summary for key points and simple definitions, Topics for a complete topic list and further-learning searches, Flashcards for recall, Quiz for scored practice, and Video for the animated Manim explainer. MP4 playback and download appear when rendering succeeds.
 
 ## Deletion
 

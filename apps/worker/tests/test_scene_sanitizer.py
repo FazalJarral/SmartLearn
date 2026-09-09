@@ -4,11 +4,18 @@ from worker.scene_sanitizer import sanitize_scene
 
 
 def test_sanitizes_scene_text():
-    scene = sanitize_scene({"template": "title", "text": ["<b>Hello</b>"], "duration_seconds": 99})
-    assert scene["text"] == ["&lt;b&gt;Hello&lt;/b&gt;"]
-    assert scene["duration_seconds"] == 12
+    scene = sanitize_scene(
+        {
+            "template": "intro",
+            "heading": "Hello",
+            "visual_elements": ["<b>Hello</b>", "Question"],
+            "duration_seconds": 99,
+        }
+    )
+    assert scene["visual_elements"] == ["&lt;b&gt;Hello&lt;/b&gt;", "Question"]
+    assert scene["duration_seconds"] == 20
 
 
 def test_rejects_unknown_template():
     with pytest.raises(ValueError):
-        sanitize_scene({"template": "python", "text": ["run code"]})
+        sanitize_scene({"template": "python", "visual_elements": ["run code"]})

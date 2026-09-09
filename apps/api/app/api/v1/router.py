@@ -28,7 +28,13 @@ from app.services.pdf_validation import validate_pdf_upload
 from app.services.quota import next_utc_midnight, remaining_uploads
 from app.services.scoring import is_correct_answer
 from app.services.supabase_client import Actor, SupabaseService
-from app.services.video_rendering import build_transcript, render_video, transcript_path, video_path
+from app.services.video_rendering import (
+    build_transcript,
+    render_video,
+    sanitize_scene,
+    transcript_path,
+    video_path,
+)
 
 router = APIRouter()
 
@@ -127,11 +133,13 @@ async def _persist_study_package(
                 "title": content["title"],
                 "overview": content["summary"]["overview"],
                 "key_points": content["summary"]["key_points"],
+                "definitions": content["summary"]["definitions"],
+                "topics": content["topics"],
                 "schema_version": content["schema_version"],
                 "model_version": generation_provider,
-                "prompt_version": "deepseek-json-v1"
+                "prompt_version": "deepseek-json-v2-manim"
                 if generation_provider.lower() == "deepseek"
-                else "mock-v1",
+                else "mock-v2-manim",
                 "completed_at": datetime.now(UTC).isoformat(),
             },
         )
@@ -167,7 +175,7 @@ async def _persist_study_package(
             "narration": content["video"]["narration"],
             "scenes": content["video"]["scenes"],
             "narration_available": False,
-            "user_message": "Video rendering is queued.",
+                "user_message": "Manim explainer rendering is queued.",
         },
     )
     await service.upsert(
@@ -295,7 +303,7 @@ async def _render_package_video(service: SupabaseService, document_id: str) -> N
         asset["id"],
         {
             "status": ProcessingStage.RENDERING_VIDEO.value,
-            "user_message": "Rendering the study video.",
+                "user_message": "Animating the concept with Manim.",
             "updated_at": datetime.now(UTC).isoformat(),
         },
     )
@@ -317,7 +325,7 @@ async def _render_package_video(service: SupabaseService, document_id: str) -> N
                 "narration_available": rendered.narration_available,
                 "error_code": None,
                 "user_message": "Video is ready.",
-                "diagnostic_detail": "Rendered silent scene-based MP4 from the generated video plan.",
+                "diagnostic_detail": "Rendered an animated Manim explainer from the safe scene plan.",
                 "updated_at": datetime.now(UTC).isoformat(),
             },
         )
@@ -705,6 +713,30 @@ async def learning_package(
     content = mock_study_package(package["title"]).model_dump()
     content["summary"]["overview"] = package["overview"]
     content["summary"]["key_points"] = package["key_points"]
+    content["summary"]["definitions"] = package.get("definitions") or [
+        {
+            "term": point["heading"],
+            "definition": point["explanation"],
+            "source_pages": point.get("source_pages", []),
+        }
+        for point in package["key_points"]
+    ]
+    content["topics"] = package.get("topics") or [
+        {
+            "name": point["heading"],
+            "description": point["explanation"],
+            "source_pages": point.get("source_pages", []),
+            "further_learning": [
+                {
+                    "title": f"Explore {point['heading']}",
+                    "resource_type": "article",
+                    "search_query": f"{package['title']} {point['heading']} explained for students",
+                    "why_it_helps": "Find another explanation and examples of this topic.",
+                }
+            ],
+        }
+        for point in package["key_points"]
+    ]
     content["flashcards"] = flashcards
     content["quiz"] = [
         {
@@ -724,7 +756,7 @@ async def learning_package(
         if video.get("narration"):
             content["video"]["narration"] = video["narration"]
         if video.get("scenes"):
-            content["video"]["scenes"] = video["scenes"]
+            content["video"]["scenes"] = [sanitize_scene(scene) for scene in video["scenes"]]
     return LearningPackageResponse(
         id=package_id,
         document_id=package["document_id"],

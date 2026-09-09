@@ -18,7 +18,8 @@ RLS:
 - Registered access policies start with profile/document ownership.
 - Guest content is intentionally accessed through backend service-role endpoints rather than anonymous table policies.
 - Private storage bucket `smartlearn-private` is configured for PDF, MP4, and transcript assets. Playback/download should be served through backend-issued signed URLs.
-- `video_assets` stores the validated safe scene DSL plan (`plan_title`, `narration`, `scenes`) separately from rendered media paths.
+- `learning_packages.definitions` stores the complete plain-language glossary, while `learning_packages.topics` stores the topic inventory and safe follow-up search suggestions.
+- `video_assets` stores the validated safe Manim scene DSL plan (`plan_title`, `narration`, `scenes`) separately from rendered media paths. AI output is data only; the application maps it to trusted Manim animations.
 
 Retention:
 

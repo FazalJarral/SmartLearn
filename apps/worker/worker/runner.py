@@ -22,7 +22,14 @@ def build_transcript(asset: dict[str, Any]) -> bytes:
     scenes = [sanitize_scene(scene) for scene in asset.get("scenes", [])]
     lines = [asset.get("plan_title") or "SmartLearn Video Plan", "", asset.get("narration") or ""]
     for index, scene in enumerate(scenes, start=1):
-        lines.extend(["", f"Scene {index}: {scene['template']}", *scene["text"]])
+        lines.extend(
+            [
+                "",
+                f"Scene {index}: {scene['heading']} ({scene['template'].replace('_', ' ')})",
+                scene["narration"],
+                "Visuals: " + ", ".join(scene["visual_elements"]),
+            ]
+        )
     return "\n".join(lines).strip().encode("utf-8")
 
 
@@ -45,7 +52,7 @@ async def process_video_asset(client: WorkerSupabaseClient, asset: dict[str, Any
         asset["id"],
         {
             "status": "rendering_video",
-            "user_message": "Preparing transcript and render assets.",
+            "user_message": "Animating the concept with Manim.",
             "updated_at": datetime.now(UTC).isoformat(),
         },
     )
@@ -67,7 +74,7 @@ async def process_video_asset(client: WorkerSupabaseClient, asset: dict[str, Any
                 "narration_available": False,
                 "error_code": None,
                 "user_message": "Video is ready.",
-                "diagnostic_detail": "Rendered silent scene-based MP4 from the generated video plan.",
+                "diagnostic_detail": "Rendered an animated Manim explainer from the safe scene plan.",
                 "updated_at": datetime.now(UTC).isoformat(),
             },
         )
