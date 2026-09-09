@@ -28,7 +28,7 @@ services:
       - key: DEEPSEEK_MODEL
         value: deepseek-v4-flash
       - key: DEEPSEEK_TIMEOUT_SECONDS
-        value: "60"
+        value: "120"
       - key: DEEPSEEK_MAX_TOKENS
         value: "10000"
       - key: MAX_EXTRACTED_CHARS

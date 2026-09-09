@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     deepseek_api_key: str = Field("", alias="DEEPSEEK_API_KEY")
     deepseek_base_url: str = Field("https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
     deepseek_model: str = Field("deepseek-v4-flash", alias="DEEPSEEK_MODEL")
-    deepseek_timeout_seconds: int = Field(60, alias="DEEPSEEK_TIMEOUT_SECONDS")
+    deepseek_timeout_seconds: int = Field(120, alias="DEEPSEEK_TIMEOUT_SECONDS")
     deepseek_max_tokens: int = Field(10000, alias="DEEPSEEK_MAX_TOKENS")
     max_extracted_chars: int = Field(60000, alias="MAX_EXTRACTED_CHARS")
     openai_api_key: str = Field("", alias="OPENAI_API_KEY")
