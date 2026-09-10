@@ -141,12 +141,18 @@ class SupabaseService:
             )
         self._raise_for_supabase_error(response)
 
-    async def storage_upload(self, path: str, data: bytes, content_type: str) -> None:
+    async def storage_upload(
+        self,
+        path: str,
+        data: bytes,
+        content_type: str,
+        upsert: bool = False,
+    ) -> None:
         headers = {
             "apikey": self.settings.supabase_service_role_key,
             "authorization": f"Bearer {self.settings.supabase_service_role_key}",
             "content-type": content_type,
-            "x-upsert": "false",
+            "x-upsert": "true" if upsert else "false",
         }
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(

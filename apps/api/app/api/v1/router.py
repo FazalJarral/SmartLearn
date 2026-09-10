@@ -314,13 +314,23 @@ async def _render_video_asset(service: SupabaseService, asset: dict) -> None:
     )
     try:
         transcript_storage_path = transcript_path(asset)
-        await service.storage_upload(transcript_storage_path, build_transcript(asset), "text/plain")
+        await service.storage_upload(
+            transcript_storage_path,
+            build_transcript(asset),
+            "text/plain",
+            upsert=True,
+        )
         with tempfile.TemporaryDirectory() as directory:
             rendered = await asyncio.to_thread(
                 render_video, asset, Path(directory), get_settings()
             )
             video_storage_path = video_path(asset)
-            await service.storage_upload(video_storage_path, rendered.path.read_bytes(), "video/mp4")
+            await service.storage_upload(
+                video_storage_path,
+                rendered.path.read_bytes(),
+                "video/mp4",
+                upsert=True,
+            )
         await service.update(
             "video_assets",
             asset["id"],
