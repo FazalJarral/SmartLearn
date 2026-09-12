@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +33,9 @@ def build_transcript(asset: dict[str, Any]) -> bytes:
     return "\n".join(lines).strip().encode("utf-8")
 
 
-async def next_video_asset(client: WorkerSupabaseClient) -> dict[str, Any] | None:
+async def next_video_asset(
+    client: WorkerSupabaseClient, lease_seconds: int = 300
+) -> dict[str, Any] | None:
     rows = await client.select(
         "video_assets",
         {
@@ -43,7 +45,26 @@ async def next_video_asset(client: WorkerSupabaseClient) -> dict[str, Any] | Non
             "limit": "1",
         },
     )
-    return rows[0] if rows else None
+    if rows:
+        return rows[0]
+
+    # If the container was killed (for example by an OOM), its exception handler
+    # never runs. Reclaim the abandoned render once its lease has expired.
+    lease_cutoff = datetime.now(UTC) - timedelta(seconds=lease_seconds)
+    stale_rows = await client.select(
+        "video_assets",
+        {
+            "select": "id,package_id,status,plan_title,narration,scenes",
+            "status": "eq.rendering_video",
+            "updated_at": f"lt.{lease_cutoff.isoformat()}",
+            "order": "updated_at.asc",
+            "limit": "1",
+        },
+    )
+    if stale_rows:
+        logger.warning("reclaiming stale video_asset=%s", stale_rows[0]["id"])
+        return stale_rows[0]
+    return None
 
 
 async def process_video_asset(client: WorkerSupabaseClient, asset: dict[str, Any]) -> None:
@@ -60,7 +81,14 @@ async def process_video_asset(client: WorkerSupabaseClient, asset: dict[str, Any
         path = transcript_path(asset)
         await client.storage_upload(path, build_transcript(asset), "text/plain")
         with tempfile.TemporaryDirectory() as directory:
-            rendered = render_video(asset, output_dir=Path(directory))
+            settings = get_settings()
+            rendered = render_video(
+                asset,
+                output_dir=Path(directory),
+                pixel_width=settings.video_pixel_width,
+                pixel_height=settings.video_pixel_height,
+                frame_rate=settings.video_frame_rate,
+            )
             mp4_path = video_path(asset)
             await client.storage_upload(mp4_path, rendered.path.read_bytes(), "video/mp4")
         await client.update_by_id(
@@ -94,7 +122,7 @@ async def process_video_asset(client: WorkerSupabaseClient, asset: dict[str, Any
 
 
 async def run_once(client: WorkerSupabaseClient) -> bool:
-    asset = await next_video_asset(client)
+    asset = await next_video_asset(client, get_settings().job_lease_seconds)
     if not asset:
         return False
     logger.info("processing video_asset=%s package=%s", asset["id"], asset["package_id"])
@@ -108,7 +136,11 @@ async def serve() -> None:
     client = WorkerSupabaseClient(settings)
     logger.info("SmartLearn worker started")
     while True:
-        processed = await run_once(client)
+        try:
+            processed = await run_once(client)
+        except Exception:
+            logger.exception("video job failed")
+            processed = False
         if not processed:
             await asyncio.sleep(settings.worker_poll_interval_seconds)
 

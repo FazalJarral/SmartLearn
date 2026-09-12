@@ -26,7 +26,14 @@ def wrap_text(text: str, width: int = 42) -> list[str]:
     return lines
 
 
-def render_video(asset: dict[str, Any], output_dir: Path) -> RenderedVideo:
+def render_video(
+    asset: dict[str, Any],
+    output_dir: Path,
+    *,
+    pixel_width: int = 854,
+    pixel_height: int = 480,
+    frame_rate: int = 15,
+) -> RenderedVideo:
     scenes = [sanitize_scene(scene) for scene in asset.get("scenes", [])[:6]]
     if not scenes:
         raise RuntimeError("video asset has no scenes")
@@ -153,9 +160,10 @@ def render_video(asset: dict[str, Any], output_dir: Path) -> RenderedVideo:
     output_dir.mkdir(parents=True, exist_ok=True)
     output = output_dir / "study-video.mp4"
     with tempconfig({
-        "pixel_width": 1280, "pixel_height": 720, "frame_rate": 30,
+        "pixel_width": pixel_width, "pixel_height": pixel_height, "frame_rate": frame_rate,
         "media_dir": str(output_dir / "manim-media"), "output_file": "study-video",
-        "format": "mp4", "write_to_movie": True, "disable_caching": True, "verbosity": "WARNING",
+        "format": "mp4", "write_to_movie": True, "disable_caching": True,
+        "verbosity": "WARNING", "progress_bar": "none",
     }):
         scene = SmartLearnExplainer(); scene.render()
         rendered = Path(scene.renderer.file_writer.movie_file_path)

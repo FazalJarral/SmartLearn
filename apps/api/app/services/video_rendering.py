@@ -236,9 +236,10 @@ def _render_with_manim(plans: list[dict[str, Any]], output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     output = output_dir / "study-video.mp4"
     with tempconfig({
-        "pixel_width": 1280, "pixel_height": 720, "frame_rate": 30,
+        "pixel_width": 854, "pixel_height": 480, "frame_rate": 15,
         "media_dir": str(output_dir / "manim-media"), "output_file": "study-video",
-        "format": "mp4", "write_to_movie": True, "disable_caching": True, "verbosity": "WARNING",
+        "format": "mp4", "write_to_movie": True, "disable_caching": True,
+        "verbosity": "WARNING", "progress_bar": "none",
     }):
         scene = SmartLearnExplainer()
         scene.render()

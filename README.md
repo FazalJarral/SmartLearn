@@ -70,9 +70,12 @@ SUPABASE_STORAGE_BUCKET=smartlearn-private
 
 ## Deployment
 
-`render.yaml` defines two Docker services on Render:
+`render.yaml` currently defines one free Docker service on Render:
 
-- `smartlearn-api`: FastAPI web service with `/health/ready` readiness checks.
-- `smartlearn-worker`: long-running worker that processes queued video assets.
+- `smartlearn-api`: FastAPI web service with `/health/ready` readiness checks and
+  low-resource inline video rendering for the demo deployment.
+
+The `apps/worker` service is ready for a separate paid background-worker deployment when
+higher-quality rendering is enabled; Render does not offer free background-worker instances.
 
 The frontend can deploy to a static host such as Vercel, Netlify, Cloudflare Pages, Render static sites, or Sites. Configure `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` for that frontend environment.
