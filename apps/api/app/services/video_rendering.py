@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import logging
 import shutil
 import subprocess
 import textwrap
@@ -11,6 +12,8 @@ from typing import Any
 import httpx
 
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
 
 MAX_VIDEO_SECONDS = 90
 MAX_NARRATION_WORDS = 180
@@ -275,7 +278,12 @@ def render_video(asset: dict[str, Any], output_dir: Path, settings: Settings | N
         raise RuntimeError("video asset has no scenes")
     total_duration = min(sum(scene["duration_seconds"] for scene in scenes), MAX_VIDEO_SECONDS)
     video_file = _render_with_manim(scenes, output_dir)
-    voiceover = synthesize_voiceover(settings, scene_narration(asset), output_dir / "voiceover.mp3") if settings else None
+    voiceover = None
+    if settings:
+        try:
+            voiceover = synthesize_voiceover(settings, scene_narration(asset), output_dir / "voiceover.mp3")
+        except Exception:
+            logger.warning("voiceover synthesis failed; delivering silent video", exc_info=True)
     if not voiceover:
         return RenderedVideo(video_file, total_duration, False)
     muxed = output_dir / "study-video-with-audio.mp4"
