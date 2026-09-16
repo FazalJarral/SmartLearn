@@ -5,6 +5,7 @@ import logging
 import shutil
 import subprocess
 import textwrap
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -106,6 +107,7 @@ def _render_with_manim(plans: list[dict[str, Any]], output_dir: Path) -> Path:
             ReplacementTransform,
             RoundedRectangle,
             Scene,
+            Succession,
             Text,
             VGroup,
             Write,
@@ -184,7 +186,7 @@ def _render_with_manim(plans: list[dict[str, Any]], output_dir: Path) -> Path:
                 group = VGroup(boxes, arrows, marker, rel)
                 self.play(LaggedStart(*[GrowFromCenter(b) for b in boxes], lag_ratio=0.12), run_time=1)
                 self.play(LaggedStart(*[GrowArrow(a) for a in arrows], lag_ratio=0.12), FadeIn(rel), run_time=0.8)
-                for box in boxes[1:]: self.play(marker.animate.move_to(box), run_time=0.3)
+                self.play(Succession(*[marker.animate.move_to(box) for box in boxes[1:]]), run_time=0.3 * (len(boxes) - 1))
                 return group, 1.8 + 0.3 * (len(boxes) - 1)
 
             if plan["template"] == "comparison":
@@ -277,13 +279,23 @@ def render_video(asset: dict[str, Any], output_dir: Path, settings: Settings | N
     if not scenes:
         raise RuntimeError("video asset has no scenes")
     total_duration = min(sum(scene["duration_seconds"] for scene in scenes), MAX_VIDEO_SECONDS)
-    video_file = _render_with_manim(scenes, output_dir)
-    voiceover = None
-    if settings:
-        try:
-            voiceover = synthesize_voiceover(settings, scene_narration(asset), output_dir / "voiceover.mp3")
-        except Exception:
-            logger.warning("voiceover synthesis failed; delivering silent video", exc_info=True)
+
+    # Manim rendering (CPU-bound) and TTS (network-bound) are independent, so run them
+    # concurrently instead of back-to-back to cut wall-clock render time.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        video_future = pool.submit(_render_with_manim, scenes, output_dir)
+        tts_future = (
+            pool.submit(synthesize_voiceover, settings, scene_narration(asset), output_dir / "voiceover.mp3")
+            if settings
+            else None
+        )
+        video_file = video_future.result()
+        voiceover = None
+        if tts_future:
+            try:
+                voiceover = tts_future.result()
+            except Exception:
+                logger.warning("voiceover synthesis failed; delivering silent video", exc_info=True)
     if not voiceover:
         return RenderedVideo(video_file, total_duration, False)
     muxed = output_dir / "study-video-with-audio.mp4"

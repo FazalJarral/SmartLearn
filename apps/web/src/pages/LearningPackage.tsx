@@ -28,9 +28,16 @@ export function LearningPackage() {
     enabled: Boolean(packageId),
     refetchInterval: (query) => {
       const status = query.state.data?.video_status;
-      return status && !["completed", "partial_success", "failed"].includes(status) ? 3000 : false;
+      return status && !["completed", "partial_success", "failed"].includes(status) ? 1500 : false;
     },
   });
+
+  useEffect(() => {
+    if (tab === "Video") {
+      result.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   if (result.isLoading) return <p>Loading package...</p>;
   if (result.error) return <p role="alert">Unable to load this learning package.</p>;

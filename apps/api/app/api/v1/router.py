@@ -110,11 +110,13 @@ async def _authorized_video_asset(service: SupabaseService, actor: Actor, video_
 
 
 async def _quiz_score(service: SupabaseService, attempt_id: str, package_id: str) -> tuple[int, int]:
-    correct_rows = await service.select(
-        "quiz_answers",
-        {"select": "id", "attempt_id": f"eq.{attempt_id}", "is_correct": "eq.true"},
+    correct_rows, question_rows = await asyncio.gather(
+        service.select(
+            "quiz_answers",
+            {"select": "id", "attempt_id": f"eq.{attempt_id}", "is_correct": "eq.true"},
+        ),
+        service.select("quiz_questions", {"select": "id", "package_id": f"eq.{package_id}"}),
     )
-    question_rows = await service.select("quiz_questions", {"select": "id", "package_id": f"eq.{package_id}"})
     return len(correct_rows), len(question_rows)
 
 
@@ -961,14 +963,16 @@ async def answer_quiz_question(
     settings = get_settings()
     service = SupabaseService(settings)
     actor = await service.actor_from_headers(authorization, x_guest_session)
-    attempt = await _authorized_attempt(service, actor, attempt_id)
-    question_rows = await service.select(
-        "quiz_questions",
-        {
-            "select": "id,package_id,correct_index,explanation",
-            "id": f"eq.{answer.question_id}",
-            "limit": "1",
-        },
+    attempt, question_rows = await asyncio.gather(
+        _authorized_attempt(service, actor, attempt_id),
+        service.select(
+            "quiz_questions",
+            {
+                "select": "id,package_id,correct_index,explanation",
+                "id": f"eq.{answer.question_id}",
+                "limit": "1",
+            },
+        ),
     )
     if not question_rows or question_rows[0]["package_id"] != attempt["package_id"]:
         raise ApiError("quiz_question_not_found", "Quiz question not found.", 404)

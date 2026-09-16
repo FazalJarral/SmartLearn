@@ -5,6 +5,7 @@ from app.api.v1.router import router as v1_router
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.core.errors import install_error_handlers
+from app.services.supabase_client import close_http_client
 
 
 def create_app() -> FastAPI:
@@ -24,6 +25,10 @@ def create_app() -> FastAPI:
     )
     install_error_handlers(app)
     app.include_router(v1_router, prefix="/api/v1")
+
+    @app.on_event("shutdown")
+    async def shutdown() -> None:
+        await close_http_client()
 
     @app.get("/health/live", tags=["health"])
     async def live() -> dict[str, str]:

@@ -13,23 +13,14 @@ class _Response:
 class _AsyncClient:
     last_headers: ClassVar[dict[str, str]] = {}
 
-    def __init__(self, **_kwargs):
-        pass
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_args):
-        return None
-
-    async def post(self, _url, *, headers, content):
+    async def post(self, _url, *, headers, content, timeout=None):
         self.__class__.last_headers = headers
         assert content == b"artifact"
         return _Response()
 
 
 def test_storage_upload_can_overwrite_retry_artifacts(monkeypatch) -> None:
-    monkeypatch.setattr(supabase_client.httpx, "AsyncClient", _AsyncClient)
+    monkeypatch.setattr(supabase_client, "_client", lambda: _AsyncClient())
     settings = Settings(
         _env_file=None,
         SUPABASE_URL="https://example.supabase.co",
@@ -43,7 +34,7 @@ def test_storage_upload_can_overwrite_retry_artifacts(monkeypatch) -> None:
 
 
 def test_storage_upload_protects_source_files_by_default(monkeypatch) -> None:
-    monkeypatch.setattr(supabase_client.httpx, "AsyncClient", _AsyncClient)
+    monkeypatch.setattr(supabase_client, "_client", lambda: _AsyncClient())
     settings = Settings(
         _env_file=None,
         SUPABASE_URL="https://example.supabase.co",

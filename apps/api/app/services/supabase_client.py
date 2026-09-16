@@ -11,6 +11,22 @@ import httpx
 from app.core.config import Settings
 from app.core.errors import ApiError
 
+_http_client: httpx.AsyncClient | None = None
+
+
+def _client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient()
+    return _http_client
+
+
+async def close_http_client() -> None:
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
+
 
 @dataclass(frozen=True)
 class Actor:
@@ -50,14 +66,14 @@ class SupabaseService:
         if not authorization or not authorization.lower().startswith("bearer "):
             return None
         token = authorization.split(" ", 1)[1].strip()
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(
-                f"{self.auth_url}/user",
-                headers={
-                    "apikey": self.settings.supabase_anon_key,
-                    "authorization": f"Bearer {token}",
-                },
-            )
+        response = await _client().get(
+            f"{self.auth_url}/user",
+            headers={
+                "apikey": self.settings.supabase_anon_key,
+                "authorization": f"Bearer {token}",
+            },
+            timeout=10,
+        )
         if response.status_code == 401:
             raise ApiError("invalid_session", "Sign in again to continue.", 401)
         response.raise_for_status()
@@ -95,50 +111,50 @@ class SupabaseService:
         return Actor(actor_type="guest", guest_session_id=rows[0]["id"])
 
     async def select(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{self.rest_url}/{table}", headers=self.service_headers, params=params)
+        response = await _client().get(
+            f"{self.rest_url}/{table}", headers=self.service_headers, params=params, timeout=10
+        )
         self._raise_for_supabase_error(response)
         return response.json()
 
     async def insert(self, table: str, payload: dict[str, Any] | list[dict[str, Any]]) -> list[dict[str, Any]]:
         headers = {**self.service_headers, "prefer": "return=representation"}
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(f"{self.rest_url}/{table}", headers=headers, json=payload)
+        response = await _client().post(f"{self.rest_url}/{table}", headers=headers, json=payload, timeout=15)
         self._raise_for_supabase_error(response)
         return response.json()
 
     async def upsert(self, table: str, payload: dict[str, Any], on_conflict: str) -> list[dict[str, Any]]:
         headers = {**self.service_headers, "prefer": "resolution=merge-duplicates,return=representation"}
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(
-                f"{self.rest_url}/{table}",
-                headers=headers,
-                params={"on_conflict": on_conflict},
-                json=payload,
-            )
+        response = await _client().post(
+            f"{self.rest_url}/{table}",
+            headers=headers,
+            params={"on_conflict": on_conflict},
+            json=payload,
+            timeout=15,
+        )
         self._raise_for_supabase_error(response)
         return response.json()
 
     async def update(self, table: str, row_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
         headers = {**self.service_headers, "prefer": "return=representation"}
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.patch(
-                f"{self.rest_url}/{table}",
-                headers=headers,
-                params={"id": f"eq.{row_id}"},
-                json=payload,
-            )
+        response = await _client().patch(
+            f"{self.rest_url}/{table}",
+            headers=headers,
+            params={"id": f"eq.{row_id}"},
+            json=payload,
+            timeout=15,
+        )
         self._raise_for_supabase_error(response)
         return response.json()
 
     async def delete(self, table: str, row_id: str) -> None:
         headers = {**self.service_headers, "prefer": "return=minimal"}
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.delete(
-                f"{self.rest_url}/{table}",
-                headers=headers,
-                params={"id": f"eq.{row_id}"},
-            )
+        response = await _client().delete(
+            f"{self.rest_url}/{table}",
+            headers=headers,
+            params={"id": f"eq.{row_id}"},
+            timeout=15,
+        )
         self._raise_for_supabase_error(response)
 
     async def storage_upload(
@@ -154,12 +170,12 @@ class SupabaseService:
             "content-type": content_type,
             "x-upsert": "true" if upsert else "false",
         }
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{self.storage_url}/object/{self.settings.supabase_storage_bucket}/{path}",
-                headers=headers,
-                content=data,
-            )
+        response = await _client().post(
+            f"{self.storage_url}/object/{self.settings.supabase_storage_bucket}/{path}",
+            headers=headers,
+            content=data,
+            timeout=30,
+        )
         self._raise_for_supabase_error(response)
 
     async def storage_download(self, path: str) -> bytes:
@@ -167,11 +183,11 @@ class SupabaseService:
             "apikey": self.settings.supabase_service_role_key,
             "authorization": f"Bearer {self.settings.supabase_service_role_key}",
         }
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(
-                f"{self.storage_url}/object/{self.settings.supabase_storage_bucket}/{path}",
-                headers=headers,
-            )
+        response = await _client().get(
+            f"{self.storage_url}/object/{self.settings.supabase_storage_bucket}/{path}",
+            headers=headers,
+            timeout=30,
+        )
         self._raise_for_supabase_error(response)
         return response.content
 
@@ -179,13 +195,13 @@ class SupabaseService:
         if not paths:
             return
         headers = {**self.service_headers, "prefer": "return=minimal"}
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.request(
-                "DELETE",
-                f"{self.storage_url}/object/{self.settings.supabase_storage_bucket}",
-                headers=headers,
-                json={"prefixes": paths},
-            )
+        response = await _client().request(
+            "DELETE",
+            f"{self.storage_url}/object/{self.settings.supabase_storage_bucket}",
+            headers=headers,
+            json={"prefixes": paths},
+            timeout=30,
+        )
         self._raise_for_supabase_error(response)
 
     async def storage_signed_url(self, path: str, expires_in: int = 300, download: bool = False) -> str:
@@ -193,12 +209,12 @@ class SupabaseService:
         payload: dict[str, Any] = {"expiresIn": expires_in}
         if download:
             payload["download"] = True
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(
-                f"{self.storage_url}/object/sign/{self.settings.supabase_storage_bucket}/{path}",
-                headers=headers,
-                json=payload,
-            )
+        response = await _client().post(
+            f"{self.storage_url}/object/sign/{self.settings.supabase_storage_bucket}/{path}",
+            headers=headers,
+            json=payload,
+            timeout=15,
+        )
         self._raise_for_supabase_error(response)
         body = response.json()
         signed_url = body.get("signedURL") or body.get("signedUrl") or body.get("signed_url")
@@ -210,8 +226,9 @@ class SupabaseService:
 
     async def rpc(self, function_name: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
         headers = {**self.service_headers, "prefer": "return=representation"}
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(f"{self.rest_url}/rpc/{function_name}", headers=headers, json=payload)
+        response = await _client().post(
+            f"{self.rest_url}/rpc/{function_name}", headers=headers, json=payload, timeout=15
+        )
         self._raise_for_supabase_error(response)
         return response.json()
 
