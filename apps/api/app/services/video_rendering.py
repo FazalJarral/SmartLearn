@@ -208,7 +208,7 @@ def _render_with_manim(plans: list[dict[str, Any]], output_dir: Path) -> Path:
                 rel = label(relation, 20, 2.5).next_to(arrow, UP, buff=0.1)
                 group = VGroup(left, right, arrow, rel)
                 self.play(GrowFromCenter(left), run_time=0.7)
-                self.play(GrowArrow(arrow), FadeIn(rel), run_time=0.8)
+                self.play(Create(arrow), FadeIn(rel), run_time=0.8)
                 self.play(GrowFromCenter(right), run_time=0.8)
                 return group, 2.3
 

@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,6 +38,8 @@ from app.services.video_rendering import (
     transcript_path,
     video_path,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -347,6 +350,7 @@ async def _render_video_asset(service: SupabaseService, asset: dict) -> None:
             },
         )
     except Exception as exc:
+        logger.exception("video_asset=%s render failed", asset["id"])
         await service.update(
             "video_assets",
             asset["id"],
