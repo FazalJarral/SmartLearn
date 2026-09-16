@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
 import { useState } from "react";
 
+import { AuthLayout } from "../components/AuthLayout";
 import { supabase } from "../lib/supabase";
 
 export function Register() {
@@ -8,39 +8,69 @@ export function Register() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setMessage(null);
+    setSubmitting(true);
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { display_name: displayName } },
     });
+    setSubmitting(false);
     setMessage(error ? error.message : "Account created. Check your email if confirmation is enabled.");
   }
 
   return (
-    <section className="max-w-md">
-      <h1 className="text-3xl font-bold">Create account</h1>
-      <p className="mt-2 text-slate-700">Registered learners keep their generated packages until deletion.</p>
+    <AuthLayout mode="signup" heading="Start with one PDF" sub="Free for your first three documents.">
       <form className="mt-6 grid gap-4" onSubmit={submit}>
-        <label className="grid gap-2 text-sm font-medium">
-          Display name
-          <input className="rounded-md border border-mist px-3 py-2" value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
+        <label className="grid gap-[7px]">
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Full name</span>
+          <input
+            className="rounded-[11px] border border-line bg-paper-input px-[15px] py-[13px] text-[15px] text-ink outline-none transition-colors focus:border-ink"
+            placeholder="Amara Osei"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            required
+          />
         </label>
-        <label className="grid gap-2 text-sm font-medium">
-          Email
-          <input className="rounded-md border border-mist px-3 py-2" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        <label className="grid gap-[7px]">
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Email</span>
+          <input
+            className="rounded-[11px] border border-line bg-paper-input px-[15px] py-[13px] text-[15px] text-ink outline-none transition-colors focus:border-ink"
+            type="email"
+            placeholder="amara@uni.edu"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
         </label>
-        <label className="grid gap-2 text-sm font-medium">
-          Password
-          <input className="rounded-md border border-mist px-3 py-2" type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
+        <label className="grid gap-[7px]">
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Password</span>
+          <input
+            className="rounded-[11px] border border-line bg-paper-input px-[15px] py-[13px] text-[15px] text-ink outline-none transition-colors focus:border-ink"
+            type="password"
+            placeholder="••••••••"
+            minLength={8}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
         </label>
-        <button className="rounded-md bg-sage px-4 py-3 font-semibold text-white">Create account</button>
+        <button
+          className="mt-2 rounded-[11px] bg-ink px-[15px] py-[15px] text-[15px] font-semibold text-paper-raised transition-colors hover:bg-rust disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={submitting}
+        >
+          {submitting ? "Creating account..." : "Create account"}
+        </button>
       </form>
-      {message ? <p className="mt-4 text-sm" role="status">{message}</p> : null}
-      <Link className="mt-4 inline-block font-semibold text-sage underline" to="/login">Already registered?</Link>
-    </section>
+      {message ? (
+        <p className="mt-4 text-sm" role="status">
+          {message}
+        </p>
+      ) : null}
+    </AuthLayout>
   );
 }

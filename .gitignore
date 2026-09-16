@@ -21,3 +21,4 @@ supabase/.temp/
 *.mp4
 *.pdf
 !apps/api/tests/fixtures/*.pdf
+design_handoff_smartlearn_redesign/
