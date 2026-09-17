@@ -7,14 +7,42 @@ export function getApiBaseUrl(value: string | undefined = import.meta.env.VITE_A
 
 const API_BASE_URL = getApiBaseUrl();
 
+// Render's free tier spins the API down after ~15 minutes idle; the first request
+// after that can fail outright (not just be slow) while it cold-starts. Retry
+// transparently with backoff before giving up, and let the UI know it's waking up.
+const WAKE_RETRY_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
+
+type WakeListener = (waking: boolean) => void;
+const wakeListeners = new Set<WakeListener>();
+
+export function subscribeToApiWakeState(listener: WakeListener): () => void {
+  wakeListeners.add(listener);
+  return () => wakeListeners.delete(listener);
+}
+
+function setWaking(waking: boolean) {
+  wakeListeners.forEach((listener) => listener(waking));
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
-  try {
-    return await fetch(input, init);
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error("The SmartLearn API is not reachable from this deployment yet.");
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(input, init);
+      if (attempt > 0) setWaking(false);
+      return response;
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      if (attempt >= WAKE_RETRY_DELAYS_MS.length) {
+        setWaking(false);
+        throw new Error("The SmartLearn API is not reachable from this deployment yet.");
+      }
+      setWaking(true);
+      await delay(WAKE_RETRY_DELAYS_MS[attempt]);
     }
-    throw error;
   }
 }
 

@@ -9,6 +9,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Upload } from "./pages/Upload";
 import { AuthProvider } from "./lib/auth";
+import { ApiWakingBanner } from "./components/ApiWakingBanner";
 import "./styles/index.css";
 
 const queryClient = new QueryClient();
@@ -19,6 +20,7 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-paper text-ink">
+            <ApiWakingBanner />
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/upload" element={<Upload />} />
