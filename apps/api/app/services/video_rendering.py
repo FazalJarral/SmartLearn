@@ -28,6 +28,7 @@ class RenderedVideo:
     path: Path
     duration_seconds: int
     narration_available: bool
+    narration_error: str | None = None
 
 
 def transcript_path(asset: dict[str, Any]) -> str:
@@ -291,13 +292,15 @@ def render_video(asset: dict[str, Any], output_dir: Path, settings: Settings | N
         )
         video_file = video_future.result()
         voiceover = None
+        narration_error: str | None = None
         if tts_future:
             try:
                 voiceover = tts_future.result()
-            except Exception:
+            except Exception as exc:
+                narration_error = str(exc)[:300]
                 logger.warning("voiceover synthesis failed; delivering silent video", exc_info=True)
     if not voiceover:
-        return RenderedVideo(video_file, total_duration, False)
+        return RenderedVideo(video_file, total_duration, False, narration_error)
     muxed = output_dir / "study-video-with-audio.mp4"
     result = subprocess.run([
         "ffmpeg", "-y", "-i", str(video_file), "-i", str(voiceover), "-t", str(MAX_VIDEO_SECONDS),

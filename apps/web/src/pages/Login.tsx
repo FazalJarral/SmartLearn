@@ -35,11 +35,6 @@ export function Login() {
     setMessage(error ? error.message : "Check your email for a reset link.");
   }
 
-  async function continueWithGoogle() {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google" });
-    if (error) setMessage(error.message);
-  }
-
   return (
     <AuthLayout mode="signin" heading="Welcome back" sub="Pick up where you left off.">
       <form className="mt-6 grid gap-4" onSubmit={submit}>
@@ -79,18 +74,6 @@ export function Login() {
           {submitting ? "Signing in..." : "Sign in"}
         </button>
       </form>
-      <div className="my-6 flex items-center gap-[13px]">
-        <hr className="flex-1 border-line" />
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">OR</span>
-        <hr className="flex-1 border-line" />
-      </div>
-      <button
-        type="button"
-        onClick={continueWithGoogle}
-        className="w-full rounded-[11px] border border-line bg-paper-input px-[13px] py-[13px] text-[14px] font-medium text-ink transition-colors hover:border-ink"
-      >
-        Continue with Google
-      </button>
       {message ? (
         <p className="mt-4 text-sm" role="status">
           {message}

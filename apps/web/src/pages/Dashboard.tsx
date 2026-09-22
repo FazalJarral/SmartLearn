@@ -86,7 +86,7 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-paper text-ink">
       <TopBar active="Library" />
-      <main className="mx-auto max-w-[1120px] px-[28px] py-[48px] pb-[72px]">
+      <main className="mx-auto max-w-[1120px] px-4 py-[48px] pb-[72px] sm:px-[28px]">
         <div className="mb-10 flex flex-wrap items-end justify-between gap-[30px]">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">

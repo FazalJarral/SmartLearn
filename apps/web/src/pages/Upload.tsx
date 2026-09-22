@@ -96,7 +96,7 @@ export function Upload() {
 
   if (isProcessing || currentStatus) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-ink px-[28px] py-12 text-paper-raised">
+      <div className="flex min-h-screen items-center justify-center bg-ink px-4 py-12 text-paper-raised sm:px-[28px]">
         <div className="w-full max-w-[620px]">
           <div className="mb-10 flex items-center gap-[18px]">
             <PdfGlyph width={44} height={56} radius={5} variant="paper" />
@@ -194,7 +194,7 @@ export function Upload() {
   return (
     <div className="min-h-screen bg-paper text-ink">
       <TopBar active="Upload" />
-      <main className="mx-auto max-w-[620px] px-[28px] py-[48px]">
+      <main className="mx-auto max-w-[620px] px-4 py-[48px] sm:px-[28px]">
         <h1 className="font-serif text-[clamp(34px,4.6vw,44px)]">Upload a study PDF</h1>
         <p className="mt-2 text-muted">Guests can process one accepted upload per UTC day. Guest results are temporary.</p>
         <div className="mt-4 rounded-[14px] border border-line bg-paper-raised px-4 py-3 text-sm text-muted">

@@ -11,7 +11,7 @@ export function TopBar({ active }: { active: "Library" | "Upload" }) {
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-paper-raised">
       <nav
-        className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-3 px-[28px] py-[15px]"
+        className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-3 px-4 py-[15px] sm:px-[28px]"
         aria-label="Primary"
       >
         <Link to="/" aria-label="SmartLearn home">

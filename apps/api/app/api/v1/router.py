@@ -347,7 +347,12 @@ async def _render_video_asset(service: SupabaseService, asset: dict) -> None:
                 "narration_available": rendered.narration_available,
                 "error_code": None,
                 "user_message": "Video is ready.",
-                "diagnostic_detail": "Rendered an animated Manim explainer from the safe scene plan.",
+                "diagnostic_detail": (
+                    f"Rendered an animated Manim explainer from the safe scene plan. "
+                    f"Voiceover synthesis failed, video has no narration audio: {rendered.narration_error}"
+                    if not rendered.narration_available and rendered.narration_error
+                    else "Rendered an animated Manim explainer from the safe scene plan."
+                ),
                 "updated_at": datetime.now(UTC).isoformat(),
             },
         )
@@ -803,6 +808,7 @@ async def learning_package(
         video_message=video_rows[0].get("user_message") if video_rows else None,
         video_available=bool(video_rows and video_rows[0].get("video_storage_path")),
         transcript_available=bool(video_rows and video_rows[0].get("transcript_storage_path")),
+        narration_available=bool(video_rows and video_rows[0].get("narration_available")),
     )
 
 

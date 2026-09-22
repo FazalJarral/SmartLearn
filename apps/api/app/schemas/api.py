@@ -50,6 +50,7 @@ class LearningPackageResponse(BaseModel):
     video_message: str | None = None
     video_available: bool = False
     transcript_available: bool = False
+    narration_available: bool = False
 
 
 class SignedUrlResponse(BaseModel):

@@ -163,6 +163,7 @@ export type LearningPackageResponse = {
   video_message: string | null;
   video_available: boolean;
   transcript_available: boolean;
+  narration_available: boolean;
 };
 
 export async function createGuestSession() {

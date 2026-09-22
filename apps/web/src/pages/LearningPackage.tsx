@@ -63,13 +63,13 @@ export function LearningPackage() {
   return (
     <div className="min-h-screen bg-paper text-ink">
       <header className="sticky top-0 z-20 border-b border-line bg-paper-raised">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-[28px] py-[13px]">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link to="/" className="whitespace-nowrap font-mono text-[11px] uppercase tracking-[0.14em] text-muted hover:text-ink">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-[13px] sm:px-[28px]">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Link to="/" className="shrink-0 whitespace-nowrap font-mono text-[11px] uppercase tracking-[0.14em] text-muted hover:text-ink">
               ← Library
             </Link>
-            <span className="h-[18px] w-px bg-line" aria-hidden="true" />
-            <p className="truncate text-sm font-medium" style={{ maxWidth: "42ch" }}>
+            <span className="h-[18px] w-px shrink-0 bg-line" aria-hidden="true" />
+            <p className="min-w-0 truncate text-sm font-medium" style={{ maxWidth: "42ch" }}>
               {content.title}
             </p>
           </div>
@@ -85,7 +85,7 @@ export function LearningPackage() {
             </button>
           ) : null}
         </div>
-        <div className="flex gap-1 overflow-x-auto px-6" role="tablist" aria-label="Learning package sections">
+        <div className="flex gap-1 overflow-x-auto px-2 sm:px-6" role="tablist" aria-label="Learning package sections">
           {tabs.map((item) => (
             <button
               key={item}
@@ -120,7 +120,7 @@ export function LearningPackage() {
             onDrillMisses={() => setTab("Flashcards")}
           />
         )}
-        {tab === "Video" && (
+        <div className={tab === "Video" ? undefined : "hidden"}>
           <VideoPlan
             accessToken={session?.access_token}
             guestSession={guestSession}
@@ -131,9 +131,10 @@ export function LearningPackage() {
             videoMessage={result.data.video_message}
             videoStatus={result.data.video_status}
             transcriptAvailable={result.data.transcript_available}
+            narrationAvailable={result.data.narration_available}
             onRetry={() => void result.refetch()}
           />
-        )}
+        </div>
       </div>
     </div>
   );
@@ -179,8 +180,8 @@ function Summary({ content, onQuizMe, onStudyCards }: SummaryProps) {
   }, [sectionIds]);
 
   return (
-    <div className="mx-auto flex max-w-[1120px] flex-wrap items-start gap-10 px-[28px] pb-20 pt-11">
-      <aside className="sticky top-[112px] flex-[1_1_210px] max-w-[250px]">
+    <div className="mx-auto flex max-w-[1120px] flex-wrap items-start gap-10 px-4 pb-20 pt-11 sm:px-[28px]">
+      <aside className="sticky top-[112px] hidden flex-[1_1_210px] max-w-[250px] lg:block">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">On this page</p>
         <nav className="mt-2 grid gap-[2px]">
           {content.summary.key_points.map((point, index) => (
@@ -291,7 +292,7 @@ type TopicsProps = {
 
 function Topics({ topics }: TopicsProps) {
   return (
-    <section className="mx-auto max-w-[1120px] space-y-4 px-[28px] pb-20 pt-11">
+    <section className="mx-auto max-w-[1120px] space-y-4 px-4 pb-20 pt-11 sm:px-[28px]">
       <div>
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-rust">Topics</p>
         <h1 className="mt-2 font-serif text-[clamp(28px,3.6vw,40px)]">Topics and further learning</h1>
@@ -359,14 +360,14 @@ function Flashcards({ cards }: FlashcardsProps) {
 
   if (!active) {
     return (
-      <div className="mx-auto max-w-[760px] px-[28px] py-20">
+      <div className="mx-auto max-w-[760px] px-4 py-20 sm:px-[28px]">
         <p className="text-muted">No flashcards were generated for this package.</p>
       </div>
     );
   }
 
   return (
-    <section className="mx-auto max-w-[760px] px-[28px] pb-20 pt-11">
+    <section className="mx-auto max-w-[760px] px-4 pb-20 pt-11 sm:px-[28px]">
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
         Card {index + 1} of {cards.length}
       </p>
@@ -461,7 +462,7 @@ function Quiz({ accessToken, guestSession, packageId, questions, onDrillMisses }
 
   if (!active) {
     return (
-      <div className="mx-auto max-w-[760px] px-[28px] py-20">
+      <div className="mx-auto max-w-[760px] px-4 py-20 sm:px-[28px]">
         <p className="text-muted">No quiz questions were generated for this package.</p>
       </div>
     );
@@ -476,7 +477,7 @@ function Quiz({ accessToken, guestSession, packageId, questions, onDrillMisses }
           ? "Strong work. One gap worth reviewing."
           : "A few gaps worth reviewing with the flashcards.";
     return (
-      <section className="mx-auto max-w-[760px] px-[28px] pb-20 pt-11">
+      <section className="mx-auto max-w-[760px] px-4 pb-20 pt-11 sm:px-[28px]">
         <div className="animate-rise rounded-xl2 bg-ink px-[34px] py-10 text-paper-raised">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-rust-light">Quiz complete</p>
           <div className="mt-3 flex items-baseline gap-3">
@@ -508,7 +509,7 @@ function Quiz({ accessToken, guestSession, packageId, questions, onDrillMisses }
   }
 
   return (
-    <section className="mx-auto max-w-[760px] px-[28px] pb-20 pt-11">
+    <section className="mx-auto max-w-[760px] px-4 pb-20 pt-11 sm:px-[28px]">
       <div className="mb-[26px] flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
@@ -651,6 +652,7 @@ type VideoPlanProps = {
   videoMessage?: string | null;
   videoAvailable: boolean;
   transcriptAvailable: boolean;
+  narrationAvailable: boolean;
   onRetry: () => void;
 };
 
@@ -670,6 +672,7 @@ function VideoPlan({
   videoMessage,
   videoStatus,
   transcriptAvailable,
+  narrationAvailable,
   onRetry,
 }: VideoPlanProps) {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
@@ -729,13 +732,14 @@ function VideoPlan({
   };
 
   return (
-    <section className="mx-auto max-w-[1000px] space-y-8 px-[28px] pb-20 pt-11">
+    <section className="mx-auto max-w-[1000px] space-y-8 px-4 pb-20 pt-11 sm:px-[28px]">
       <div className="overflow-hidden rounded-xl2 border border-ink-line bg-ink">
         {playbackUrl ? (
           <video
             ref={videoRef}
             className="aspect-video w-full bg-black"
             controls
+            playsInline
             src={playbackUrl}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -803,6 +807,11 @@ function VideoPlan({
       {download.error ? <p className="text-sm text-warn-ink">{download.error.message}</p> : null}
       {transcript.error ? <p className="text-sm text-warn-ink">{transcript.error.message}</p> : null}
       {retry.error ? <p className="text-sm text-warn-ink">{retry.error.message}</p> : null}
+      {videoAvailable && !narrationAvailable ? (
+        <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-muted">
+          No narration audio for this video — read along with the script below.
+        </p>
+      ) : null}
 
       <p className="max-w-[70ch] text-[17px] leading-[1.68] text-ink-soft">{video.narration}</p>
 
