@@ -36,8 +36,14 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: TTS_PROVIDER
-        value: openai
+        value: piper
       - key: TTS_MODEL
         value: gpt-4o-mini-tts
       - key: TTS_VOICE
         value: alloy
+      - key: GOOGLE_TTS_API_KEY
+        sync: false
+      - key: GOOGLE_TTS_VOICE
+        value: en-US-Standard-C
+      - key: GOOGLE_TTS_LANGUAGE_CODE
+        value: en-US

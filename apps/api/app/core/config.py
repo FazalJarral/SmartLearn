@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     tts_provider: str = Field("openai", alias="TTS_PROVIDER")
     tts_model: str = Field("gpt-4o-mini-tts", alias="TTS_MODEL")
     tts_voice: str = Field("alloy", alias="TTS_VOICE")
+    piper_bin: str = Field("/opt/piper/piper", alias="PIPER_BIN")
+    piper_voice_model: str = Field(
+        "/opt/piper/voices/en_US-lessac-medium.onnx", alias="PIPER_VOICE_MODEL"
+    )
+    google_tts_api_key: str = Field("", alias="GOOGLE_TTS_API_KEY")
+    google_tts_voice: str = Field("en-US-Standard-C", alias="GOOGLE_TTS_VOICE")
+    google_tts_language_code: str = Field("en-US", alias="GOOGLE_TTS_LANGUAGE_CODE")
 
     @property
     def cors_origins(self) -> list[str]:

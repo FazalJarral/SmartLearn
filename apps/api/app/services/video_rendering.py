@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import html
 import logging
+import os
 import shutil
 import subprocess
 import textwrap
@@ -256,13 +258,9 @@ def _render_with_manim(plans: list[dict[str, Any]], output_dir: Path) -> Path:
     return output
 
 
-def synthesize_voiceover(settings: Settings, text: str, output_path: Path) -> Path | None:
-    if settings.tts_provider.lower() != "openai":
-        return None
+def _synthesize_openai(settings: Settings, text: str, output_path: Path) -> Path:
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is required for voiceover generation")
-    if not text.strip():
-        return None
     response = httpx.post(
         "https://api.openai.com/v1/audio/speech",
         headers={"authorization": f"Bearer {settings.openai_api_key}"},
@@ -273,6 +271,76 @@ def synthesize_voiceover(settings: Settings, text: str, output_path: Path) -> Pa
         raise RuntimeError(f"OpenAI TTS failed: {response.text[:500]}")
     output_path.write_bytes(response.content)
     return output_path
+
+
+def _synthesize_piper(settings: Settings, text: str, output_path: Path) -> Path:
+    piper_bin = Path(settings.piper_bin)
+    piper_model = Path(settings.piper_voice_model)
+    if not piper_bin.exists():
+        raise RuntimeError(f"Piper binary not found at {piper_bin}")
+    if not piper_model.exists():
+        raise RuntimeError(f"Piper voice model not found at {piper_model}")
+    env = {**os.environ, "LD_LIBRARY_PATH": str(piper_bin.parent)}
+    result = subprocess.run(
+        [str(piper_bin), "--model", str(piper_model), "--output_file", str(output_path)],
+        input=text,
+        capture_output=True,
+        text=True,
+        cwd=str(piper_bin.parent),
+        env=env,
+        timeout=120,
+        check=False,
+    )
+    if result.returncode != 0 or not output_path.exists():
+        raise RuntimeError(f"Piper TTS failed: {(result.stderr or '').strip()[:400]}")
+    return output_path
+
+
+def _synthesize_google(settings: Settings, text: str, output_path: Path) -> Path:
+    if not settings.google_tts_api_key:
+        raise RuntimeError("GOOGLE_TTS_API_KEY is required for Google TTS fallback")
+    response = httpx.post(
+        "https://texttospeech.googleapis.com/v1/text:synthesize",
+        params={"key": settings.google_tts_api_key},
+        json={
+            "input": {"text": text},
+            "voice": {
+                "languageCode": settings.google_tts_language_code,
+                "name": settings.google_tts_voice,
+            },
+            "audioConfig": {"audioEncoding": "MP3"},
+        },
+        timeout=60,
+    )
+    if not response.is_success:
+        raise RuntimeError(f"Google TTS failed: {response.text[:500]}")
+    audio_b64 = response.json().get("audioContent")
+    if not audio_b64:
+        raise RuntimeError("Google TTS response missing audioContent")
+    output_path.write_bytes(base64.b64decode(audio_b64))
+    return output_path
+
+
+def synthesize_voiceover(settings: Settings, text: str, output_path: Path) -> Path | None:
+    if not text.strip():
+        return None
+    provider = settings.tts_provider.lower()
+    if provider == "openai":
+        return _synthesize_openai(settings, text, output_path)
+    if provider != "piper":
+        return None
+    try:
+        return _synthesize_piper(settings, text, output_path)
+    except Exception as piper_exc:
+        logger.warning("Piper TTS failed; trying Google TTS fallback", exc_info=True)
+        if not settings.google_tts_api_key:
+            raise
+        try:
+            return _synthesize_google(settings, text, output_path)
+        except Exception as google_exc:
+            raise RuntimeError(
+                f"Piper failed ({piper_exc}); Google fallback failed ({google_exc})"
+            ) from google_exc
 
 
 def render_video(asset: dict[str, Any], output_dir: Path, settings: Settings | None = None) -> RenderedVideo:
@@ -286,7 +354,7 @@ def render_video(asset: dict[str, Any], output_dir: Path, settings: Settings | N
     with ThreadPoolExecutor(max_workers=2) as pool:
         video_future = pool.submit(_render_with_manim, scenes, output_dir)
         tts_future = (
-            pool.submit(synthesize_voiceover, settings, scene_narration(asset), output_dir / "voiceover.mp3")
+            pool.submit(synthesize_voiceover, settings, scene_narration(asset), output_dir / "voiceover.audio")
             if settings
             else None
         )
