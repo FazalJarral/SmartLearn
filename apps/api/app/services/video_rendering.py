@@ -280,16 +280,23 @@ def _synthesize_piper(settings: Settings, text: str, output_path: Path) -> Path:
     if not piper_model.exists():
         raise RuntimeError(f"Piper voice model not found at {piper_model}")
     env = {**os.environ, "LD_LIBRARY_PATH": str(piper_bin.parent)}
-    result = subprocess.run(
-        [str(piper_bin), "--model", str(piper_model), "--output_file", str(output_path)],
-        input=text,
-        capture_output=True,
-        text=True,
-        cwd=str(piper_bin.parent),
-        env=env,
-        timeout=180,
-        check=False,
-    )
+    # Piper has been observed to hang (not just run slowly) on constrained hosts,
+    # never completing even with a generous timeout. Fail fast so the Google
+    # fallback actually gets a chance to run instead of blocking every render.
+    try:
+        result = subprocess.run(
+            [str(piper_bin), "--model", str(piper_model), "--output_file", str(output_path)],
+            input=text,
+            capture_output=True,
+            text=True,
+            cwd=str(piper_bin.parent),
+            env=env,
+            timeout=25,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stderr = (exc.stderr or "").strip()[:400]
+        raise RuntimeError(f"Piper TTS timed out after {exc.timeout}s; stderr: {stderr or '(none)'}") from exc
     if result.returncode != 0 or not output_path.exists():
         raise RuntimeError(f"Piper TTS failed: {(result.stderr or '').strip()[:400]}")
     return output_path
