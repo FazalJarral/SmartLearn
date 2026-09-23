@@ -7,7 +7,6 @@ import os
 import shutil
 import subprocess
 import textwrap
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -288,7 +287,7 @@ def _synthesize_piper(settings: Settings, text: str, output_path: Path) -> Path:
         text=True,
         cwd=str(piper_bin.parent),
         env=env,
-        timeout=120,
+        timeout=180,
         check=False,
     )
     if result.returncode != 0 or not output_path.exists():
@@ -349,26 +348,33 @@ def render_video(asset: dict[str, Any], output_dir: Path, settings: Settings | N
         raise RuntimeError("video asset has no scenes")
     total_duration = min(sum(scene["duration_seconds"] for scene in scenes), MAX_VIDEO_SECONDS)
 
-    # Manim rendering (CPU-bound) and TTS (network-bound) are independent, so run them
-    # concurrently instead of back-to-back to cut wall-clock render time.
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        video_future = pool.submit(_render_with_manim, scenes, output_dir)
-        tts_future = (
-            pool.submit(synthesize_voiceover, settings, scene_narration(asset), output_dir / "voiceover.audio")
-            if settings
-            else None
-        )
-        video_file = video_future.result()
-        voiceover = None
-        narration_error: str | None = None
-        if tts_future:
-            try:
-                voiceover = tts_future.result()
-            except Exception as exc:
-                narration_error = str(exc)[:300]
-                logger.warning("voiceover synthesis failed; delivering silent video", exc_info=True)
+    # Manim rendering and TTS both run one CPU-bound process each. They used to run
+    # concurrently on the assumption that TTS was a network call (true for OpenAI), but
+    # a self-hosted engine like Piper competes with Manim for the same limited CPU on
+    # constrained hosts, which made both take much longer (and let Piper hit its
+    # timeout). Run them sequentially instead so each gets full CPU availability.
+    video_file = _render_with_manim(scenes, output_dir)
+    voiceover = None
+    narration_error: str | None = None
+    if settings:
+        try:
+            voiceover = synthesize_voiceover(settings, scene_narration(asset), output_dir / "voiceover.audio")
+        except Exception as exc:
+            narration_error = str(exc)[:300]
+            logger.warning("voiceover synthesis failed; delivering silent video", exc_info=True)
     if not voiceover:
-        return RenderedVideo(video_file, total_duration, False, narration_error)
+        # Manim's raw output has moov at the end of the file, which many browsers
+        # refuse to play progressively. Remux (no re-encode) to move it to the front,
+        # same as the muxed-with-audio path below already does.
+        faststart = output_dir / "study-video-faststart.mp4"
+        remux = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(video_file), "-c", "copy", "-movflags", "+faststart", str(faststart)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        delivered = faststart if remux.returncode == 0 and faststart.exists() else video_file
+        return RenderedVideo(delivered, total_duration, False, narration_error)
     muxed = output_dir / "study-video-with-audio.mp4"
     result = subprocess.run([
         "ffmpeg", "-y", "-i", str(video_file), "-i", str(voiceover), "-t", str(MAX_VIDEO_SECONDS),
