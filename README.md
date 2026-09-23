@@ -21,6 +21,23 @@ The project is production-oriented: the API validates uploads, enforces quotas, 
 
 ## Setup
 
+For the easiest local start on Windows, run:
+
+```powershell
+npm run dev_test
+```
+
+On its first run, this command creates `.venv`, installs missing Node and Python
+dependencies, validates the local environment files, and starts both the Vite frontend
+and FastAPI backend. Press `Ctrl+C` to stop both. To also start the standalone video
+worker, use `npm run dev_test:worker`.
+
+If `.env` or `apps/web/.env.local` is missing, the command creates it from the matching
+example and reports which credentials still need to be configured. Supabase service-role
+credentials remain server-only and must never use a `VITE_` prefix.
+
+For manual setup instead:
+
 ```powershell
 npm install
 python -m venv .venv
